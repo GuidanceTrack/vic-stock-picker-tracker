@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public read for leaderboard data
+    match /authorMetrics/{doc} {
+      allow read: if true;
+      allow write: if false;  // Only backend writes
+    }
+    match /authors/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /ideas/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    // Prices and logs are internal
+    match /prices/{doc} {
+      allow read, write: if false;
+    }
+    match /scrapeLog/{doc} {
+      allow read, write: if false;
+    }
+    // Stats collection for aggregate data
+    match /stats/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
