@@ -14,9 +14,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
-    // Prices and logs are internal
+    // Prices - public read for current stock prices
     match /prices/{doc} {
-      allow read, write: if false;
+      allow read: if true;
+      allow write: if false;
     }
     match /scrapeLog/{doc} {
       allow read, write: if false;

@@ -148,16 +148,25 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
-    // Prices and logs are internal
+    // Prices - public read for current stock prices (needed for expanded author rows)
     match /prices/{doc} {
-      allow read, write: if false;
+      allow read: if true;
+      allow write: if false;
     }
+    // Logs are internal only
     match /scrapeLog/{doc} {
       allow read, write: if false;
+    }
+    // Stats collection for aggregate data
+    match /stats/{doc} {
+      allow read: if true;
+      allow write: if false;
     }
   }
 }
 ```
+
+> **Note:** The `prices` collection must have public read access because the frontend's `getAuthorWithIdeas()` function fetches current prices to calculate returns for the expanded author row view.
 
 ---
 
@@ -817,12 +826,49 @@ functions.http('dailyScrape', async (req, res) => {
      - #4 devo791: 13.2% XIRR (2 picks)
      - #5 Motherlode: -2.4% XIRR (2 picks)
 
-### Step 4: Frontend Integration
+### Step 4: Frontend Integration ✅ (Completed Dec 22, 2025)
 - [x] Set up Vite + React + Tailwind project *(prototype created)*
-- [ ] Add Firebase SDK to frontend
-- [ ] Migrate vic-leaderboard.jsx to use Firestore
-- [ ] Add loading states and error handling
+- [x] Add Firebase SDK to frontend
+- [x] Migrate vic-leaderboard.jsx to use Firestore
+- [x] Add loading states and error handling
 - [ ] Deploy to Vercel (free)
+
+**What was done:**
+
+1. **Installed Firebase SDK:**
+   - Added `firebase` package to frontend dependencies
+   - Created `src/firebase.js` - Firebase app initialization with Firestore
+
+2. **Created Firestore Data Layer:**
+   - `src/services/firestore.js` - Firestore query functions:
+     - `getLeaderboard(sortBy, limit)` - Fetch sorted leaderboard
+     - `getAuthorWithIdeas(username)` - Fetch author details with ideas and current prices
+     - `getAggregateStats()` - Fetch aggregate statistics
+
+3. **Created React Hooks:**
+   - `src/hooks/useLeaderboard.js` - Real-time subscription to leaderboard data
+   - `src/hooks/useAuthor.js` - Fetch individual author details on demand
+
+4. **Updated VICLeaderboard Component:**
+   - Replaced mock data with Firestore real-time data
+   - Added loading spinner while data fetches
+   - Added error state with retry button
+   - Added empty state when no data exists
+   - Expanded rows now fetch author's ideas from Firestore
+   - Handles Firestore timestamps properly
+
+5. **Environment Configuration:**
+   - Created `.env` with Firebase config values
+   - Updated `.gitignore` to exclude `.env` files
+
+**Files created/modified:**
+- `frontend/src/firebase.js` - Firebase initialization
+- `frontend/src/services/firestore.js` - Firestore queries
+- `frontend/src/hooks/useLeaderboard.js` - Leaderboard hook
+- `frontend/src/hooks/useAuthor.js` - Author details hook
+- `frontend/src/components/VICLeaderboard.jsx` - Updated to use Firestore
+- `frontend/.env` - Firebase config (gitignored)
+- `frontend/.gitignore` - Added .env exclusion
 
 ### Step 5: Cloud Functions
 - [ ] Deploy scraper as Cloud Function
@@ -1056,13 +1102,14 @@ We will build this as a **"Stock-Picking Tracker"** (not a "Performance Tracker"
 | XIRR Calculator | ✅ Done | Performance metrics calculating correctly |
 | Sample Data | ✅ Done | 13 ideas across 5 authors, all with prices |
 | Frontend Prototype | ✅ Done | React + Vite + Tailwind at localhost:5174 |
+| Frontend Firebase | ✅ Done | Firebase SDK integrated, real-time data fetching |
 
-### What's Next (Step 4: Frontend Integration)
+### What's Next (Step 5: Cloud Functions)
 
-1. **Add Firebase SDK to frontend** - Connect React app to Firestore
-2. **Migrate vic-leaderboard.jsx** - Replace mock data with real Firestore data
-3. **Add loading states** - Handle async data fetching
-4. **Deploy to Vercel** - Production deployment
+1. **Deploy scraper as Cloud Function** - Automate daily author scraping
+2. **Deploy price updater as Cloud Function** - Automate daily price updates
+3. **Deploy metrics calculator as Cloud Function** - Automate metrics recalculation
+4. **Deploy to Vercel** - Production deployment of frontend
 
 ### Key Files to Know
 
@@ -1075,6 +1122,10 @@ We will build this as a **"Stock-Picking Tracker"** (not a "Performance Tracker"
 | `functions/src/services/performance-calculator.js` | XIRR & metrics calculation |
 | `functions/session/cookies.json` | VIC login (refresh if expired) |
 | `functions/service-account-key.json` | Firebase Admin auth (never commit!) |
+| `frontend/src/firebase.js` | Firebase client initialization |
+| `frontend/src/services/firestore.js` | Firestore query functions |
+| `frontend/src/hooks/useLeaderboard.js` | Real-time leaderboard data hook |
+| `frontend/src/components/VICLeaderboard.jsx` | Main leaderboard UI component |
 
 ### How to Run
 
@@ -1113,3 +1164,26 @@ cd frontend && npm run dev
 - `functions/service-account-key.json` - Firebase Admin credentials
 - `functions/session/*` - VIC login cookies
 - `.env` files - Environment variables
+
+---
+
+## 🐛 Bug Fixes & Changes Log
+
+### Dec 22, 2025 - Firestore Security Rules Fix
+
+**Issue:** Clicking to expand an author row showed "Could not load recommendations" error.
+
+**Root Cause:** The `prices` collection had `allow read: if false` in Firestore security rules, but the frontend's `getAuthorWithIdeas()` function in `frontend/src/services/firestore.js` needs to read from `prices` collection to fetch current stock prices and calculate returns for the expanded view.
+
+**Fix Applied:**
+1. Updated `firebase/firestore.rules` to allow public read on `prices` collection:
+   ```javascript
+   match /prices/{doc} {
+     allow read: if true;   // Changed from: allow read, write: if false;
+     allow write: if false;
+   }
+   ```
+2. Deployed updated rules: `firebase deploy --only firestore:rules`
+
+**Files Modified:**
+- `firebase/firestore.rules` - Added public read access to `prices` collection

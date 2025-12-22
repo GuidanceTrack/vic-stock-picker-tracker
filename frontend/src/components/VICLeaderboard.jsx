@@ -1,148 +1,13 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ExternalLink, Target, Clock, BarChart3, AlertTriangle, Info } from 'lucide-react';
-
-// Mock data - this would come from your scraper + database
-const mockInvestors = [
-  {
-    id: 1,
-    username: "ValueHunter92",
-    xirr5yr: 28.4,
-    xirr3yr: 31.2,
-    xirr1yr: 18.7,
-    totalPicks: 47,
-    winRate: 72,
-    avgHoldingPeriod: "14 months",
-    lastActive: "2 days ago",
-    bestPick: { name: "CROX", return: 312 },
-    recentPicks: [
-      { ticker: "CROX", date: "2021-03-15", priceAtRec: 62.50, currentPrice: 257.30, return: 312, type: "long" },
-      { ticker: "GOOGL", date: "2022-08-10", priceAtRec: 118.20, currentPrice: 178.50, return: 51, type: "long" },
-      { ticker: "META", date: "2022-11-01", priceAtRec: 96.40, currentPrice: 585.00, return: 507, type: "long" },
-      { ticker: "PYPL", date: "2023-05-20", priceAtRec: 62.80, currentPrice: 68.20, return: 9, type: "long" },
-    ]
-  },
-  {
-    id: 2,
-    username: "DeepValueDan",
-    xirr5yr: 24.1,
-    xirr3yr: 22.8,
-    xirr1yr: 29.3,
-    totalPicks: 89,
-    winRate: 68,
-    avgHoldingPeriod: "18 months",
-    lastActive: "1 week ago",
-    bestPick: { name: "NVDA", return: 485 },
-    recentPicks: [
-      { ticker: "NVDA", date: "2020-06-01", priceAtRec: 37.50, currentPrice: 219.50, return: 485, type: "long" },
-      { ticker: "AAPL", date: "2023-01-15", priceAtRec: 135.20, currentPrice: 228.80, return: 69, type: "long" },
-      { ticker: "COST", date: "2023-09-01", priceAtRec: 565.00, currentPrice: 920.50, return: 63, type: "long" },
-    ]
-  },
-  {
-    id: 3,
-    username: "ContrarianKing",
-    xirr5yr: 21.7,
-    xirr3yr: 19.4,
-    xirr1yr: 24.1,
-    totalPicks: 62,
-    winRate: 65,
-    avgHoldingPeriod: "22 months",
-    lastActive: "3 days ago",
-    bestPick: { name: "AMD", return: 198 },
-    recentPicks: [
-      { ticker: "AMD", date: "2022-10-15", priceAtRec: 58.20, currentPrice: 173.50, return: 198, type: "long" },
-      { ticker: "DIS", date: "2023-11-01", priceAtRec: 82.50, currentPrice: 108.20, return: 31, type: "long" },
-      { ticker: "INTC", date: "2024-08-15", priceAtRec: 19.80, currentPrice: 24.50, return: 24, type: "long" },
-    ]
-  },
-  {
-    id: 4,
-    username: "SmallCapSteve",
-    xirr5yr: 19.8,
-    xirr3yr: 17.2,
-    xirr1yr: 15.4,
-    totalPicks: 124,
-    winRate: 58,
-    avgHoldingPeriod: "11 months",
-    lastActive: "5 days ago",
-    bestPick: { name: "SMCI", return: 892 },
-    recentPicks: [
-      { ticker: "SMCI", date: "2022-01-10", priceAtRec: 42.50, currentPrice: 421.80, return: 892, type: "long" },
-      { ticker: "BOOT", date: "2023-06-20", priceAtRec: 78.20, currentPrice: 165.40, return: 112, type: "long" },
-      { ticker: "CELH", date: "2024-01-05", priceAtRec: 52.80, currentPrice: 28.50, return: -46, type: "long" },
-    ]
-  },
-  {
-    id: 5,
-    username: "QualityCompounder",
-    xirr5yr: 18.2,
-    xirr3yr: 20.5,
-    xirr1yr: 22.8,
-    totalPicks: 31,
-    winRate: 81,
-    avgHoldingPeriod: "36 months",
-    lastActive: "2 weeks ago",
-    bestPick: { name: "MSFT", return: 156 },
-    recentPicks: [
-      { ticker: "MSFT", date: "2021-05-01", priceAtRec: 252.40, currentPrice: 645.80, return: 156, type: "long" },
-      { ticker: "V", date: "2022-03-15", priceAtRec: 212.50, currentPrice: 318.20, return: 50, type: "long" },
-      { ticker: "UNH", date: "2023-04-01", priceAtRec: 498.20, currentPrice: 585.40, return: 18, type: "long" },
-    ]
-  },
-  {
-    id: 6,
-    username: "TurnaroundTom",
-    xirr5yr: 15.4,
-    xirr3yr: 12.8,
-    xirr1yr: 8.2,
-    totalPicks: 78,
-    winRate: 52,
-    avgHoldingPeriod: "9 months",
-    lastActive: "1 day ago",
-    bestPick: { name: "GM", return: 87 },
-    recentPicks: [
-      { ticker: "GM", date: "2023-01-20", priceAtRec: 34.50, currentPrice: 64.50, return: 87, type: "long" },
-      { ticker: "F", date: "2023-08-10", priceAtRec: 12.20, currentPrice: 10.80, return: -11, type: "long" },
-      { ticker: "WBD", date: "2024-05-01", priceAtRec: 8.50, currentPrice: 12.20, return: 44, type: "long" },
-    ]
-  },
-  {
-    id: 7,
-    username: "DividendDave",
-    xirr5yr: 12.8,
-    xirr3yr: 11.5,
-    xirr1yr: 14.2,
-    totalPicks: 56,
-    winRate: 75,
-    avgHoldingPeriod: "48 months",
-    lastActive: "4 days ago",
-    bestPick: { name: "O", return: 45 },
-    recentPicks: [
-      { ticker: "O", date: "2021-09-01", priceAtRec: 68.50, currentPrice: 99.20, return: 45, type: "long" },
-      { ticker: "JNJ", date: "2022-12-15", priceAtRec: 178.20, currentPrice: 158.50, return: -11, type: "long" },
-      { ticker: "PG", date: "2023-07-01", priceAtRec: 152.80, currentPrice: 172.40, return: 13, type: "long" },
-    ]
-  },
-  {
-    id: 8,
-    username: "ShortSeller99",
-    xirr5yr: 11.2,
-    xirr3yr: 14.8,
-    xirr1yr: 19.5,
-    totalPicks: 43,
-    winRate: 61,
-    avgHoldingPeriod: "8 months",
-    lastActive: "6 days ago",
-    bestPick: { name: "CVNA", return: 245 },
-    recentPicks: [
-      { ticker: "CVNA", date: "2022-08-01", priceAtRec: 52.80, currentPrice: 18.50, return: 245, type: "short" },
-      { ticker: "GME", date: "2023-03-15", priceAtRec: 22.40, currentPrice: 28.10, return: -25, type: "short" },
-      { ticker: "BYND", date: "2023-11-01", priceAtRec: 12.80, currentPrice: 5.20, return: 59, type: "short" },
-    ]
-  },
-];
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ExternalLink, Target, Clock, BarChart3, Info, Loader2, AlertCircle } from 'lucide-react';
+import { useLeaderboard } from '../hooks/useLeaderboard';
+import { useAuthor } from '../hooks/useAuthor';
 
 const XIRRBadge = ({ value }) => {
+  if (value === null || value === undefined) {
+    return <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-500">N/A</span>;
+  }
+
   const getColor = (val) => {
     if (val >= 25) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
     if (val >= 15) return 'bg-green-100 text-green-800 border-green-300';
@@ -159,13 +24,17 @@ const XIRRBadge = ({ value }) => {
 };
 
 const ReturnBadge = ({ value, type = "long" }) => {
+  if (value === null || value === undefined) {
+    return <span className="text-xs text-slate-400">N/A</span>;
+  }
+
   const isPositive = value >= 0;
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
       isPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
     }`}>
       {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-      {isPositive ? '+' : ''}{value}%
+      {isPositive ? '+' : ''}{Math.round(value)}%
       {type === "short" && <span className="text-xs opacity-70">(S)</span>}
     </span>
   );
@@ -178,62 +47,150 @@ const RankBadge = ({ rank }) => {
   return <span className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-sm font-bold text-slate-600">{rank}</span>;
 };
 
-const DisclaimerBanner = ({ onDismiss }) => {
-  const [expanded, setExpanded] = useState(false);
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center py-12">
+    <Loader2 className="animate-spin text-blue-600" size={32} />
+    <span className="ml-3 text-slate-600">Loading leaderboard...</span>
+  </div>
+);
+
+const ErrorMessage = ({ error, onRetry }) => (
+  <div className="flex flex-col items-center justify-center py-12">
+    <AlertCircle className="text-red-500 mb-3" size={40} />
+    <h3 className="text-lg font-semibold text-slate-900 mb-1">Failed to load data</h3>
+    <p className="text-sm text-slate-600 mb-4">{error?.message || 'An unexpected error occurred'}</p>
+    {onRetry && (
+      <button
+        onClick={onRetry}
+        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Try Again
+      </button>
+    )}
+  </div>
+);
+
+const EmptyState = () => (
+  <div className="flex flex-col items-center justify-center py-12">
+    <BarChart3 className="text-slate-300 mb-3" size={48} />
+    <h3 className="text-lg font-semibold text-slate-900 mb-1">No data yet</h3>
+    <p className="text-sm text-slate-600">Leaderboard data will appear here once authors are scraped.</p>
+  </div>
+);
+
+const ExpandedRow = ({ username }) => {
+  const { data: author, loading, error } = useAuthor(username);
+
+  if (loading) {
+    return (
+      <tr className="bg-slate-50">
+        <td colSpan={8} className="px-4 py-6">
+          <div className="flex items-center justify-center">
+            <Loader2 className="animate-spin text-blue-600" size={20} />
+            <span className="ml-2 text-sm text-slate-600">Loading recommendations...</span>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  if (error || !author) {
+    return (
+      <tr className="bg-slate-50">
+        <td colSpan={8} className="px-4 py-4">
+          <p className="text-sm text-slate-500 text-center">Could not load recommendations</p>
+        </td>
+      </tr>
+    );
+  }
+
+  const ideas = author.ideas || [];
 
   return (
-    <div className="bg-amber-50 border-b border-amber-200">
-      <div className="max-w-7xl mx-auto px-6 py-3">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-          <div className="flex-1">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-amber-800">
-                Stock-Picking Tracker - Not Actual Performance
-              </h3>
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="text-amber-700 hover:text-amber-900 text-xs flex items-center gap-1"
-              >
-                {expanded ? 'Less' : 'More info'}
-                {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </button>
+    <tr className="bg-slate-50">
+      <td colSpan={8} className="px-4 py-4">
+        <div className="ml-16">
+          <div className="flex items-center gap-2 mb-3">
+            <h4 className="text-sm font-semibold text-slate-700">Recent Recommendations</h4>
+            <a
+              href={`https://valueinvestorsclub.com/member/${username}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              View on VIC <ExternalLink size={10} />
+            </a>
+          </div>
+          {ideas.length > 0 ? (
+            <div className="grid grid-cols-4 gap-3">
+              {ideas.slice(0, 4).map((idea, i) => (
+                <div key={idea.id || i} className="bg-white rounded-lg border border-slate-200 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1">
+                      <span className="font-mono font-bold text-slate-900">{idea.ticker}</span>
+                      {idea.positionType === "short" && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">SHORT</span>
+                      )}
+                    </div>
+                    <ReturnBadge value={idea.return} type={idea.positionType} />
+                  </div>
+                  <div className="text-xs text-slate-500 space-y-1">
+                    <div>Rec'd: {formatDate(idea.postedDate)}</div>
+                    <div>Entry: ${idea.priceAtRec?.toFixed(2) || 'N/A'}</div>
+                    <div>Current: ${idea.currentPrice?.toFixed(2) || 'N/A'}</div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <p className="text-xs text-amber-700 mt-1">
-              Returns shown are <strong>hypothetical buy-and-hold</strong> calculations, not actual trading results.
-            </p>
-            {expanded && (
-              <div className="mt-3 text-xs text-amber-700 space-y-2 border-t border-amber-200 pt-3">
-                <p>
-                  <strong>What this shows:</strong> If you had bought each stock on the recommendation date and held until today, what would your return be?
-                </p>
-                <p>
-                  <strong>What this does NOT show:</strong> Authors' actual trading performance. VIC members are not required to disclose when they sell positions, so we cannot track real exits.
-                </p>
-                <p>
-                  <strong>Why this matters:</strong> An author could recommend a stock at $50, sell at $100 (+100% real gain), and the stock could later fall to $25. Our tracker would show -50%, even though they actually made +100%.
-                </p>
-                <p className="font-medium">
-                  Use this as a measure of <em>stock-picking quality</em>, not trading skill or actual returns.
-                </p>
-              </div>
-            )}
+          ) : (
+            <p className="text-sm text-slate-500">No recommendations found</p>
+          )}
+          <div className="mt-3 flex items-center gap-6 text-xs text-slate-500">
+            <span className="flex items-center gap-1">
+              <Target size={12} />
+              {author.totalPicks || ideas.length} total picks analyzed
+            </span>
           </div>
         </div>
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 };
+
+// Helper to format Firestore timestamp or date string
+function formatDate(date) {
+  if (!date) return 'N/A';
+
+  // Handle Firestore Timestamp
+  if (date?.toDate) {
+    return date.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  // Handle seconds (Firestore timestamp as object)
+  if (date?.seconds) {
+    return new Date(date.seconds * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  // Handle string or Date
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
 
 export default function VICLeaderboard() {
   const [expandedRow, setExpandedRow] = useState(null);
   const [timeFilter, setTimeFilter] = useState('5yr');
   const [showMethodology, setShowMethodology] = useState(false);
 
-  const sortedInvestors = [...mockInvestors].sort((a, b) => {
-    const key = `xirr${timeFilter}`;
-    return b[key] - a[key];
-  });
+  // Map filter to Firestore field name
+  const sortField = `xirr${timeFilter}`;
+  const { data: investors, loading, error } = useLeaderboard(sortField, 50);
+
+  // Get last updated date from first investor's calculatedAt
+  const lastUpdated = investors[0]?.calculatedAt;
+  const lastUpdatedStr = lastUpdated
+    ? formatDate(lastUpdated)
+    : 'N/A';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -260,7 +217,7 @@ export default function VICLeaderboard() {
               </button>
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Clock size={14} />
-                Updated: Dec 21, 2025
+                Updated: {lastUpdatedStr}
               </div>
             </div>
           </div>
@@ -299,117 +256,91 @@ export default function VICLeaderboard() {
 
         {/* Leaderboard Table */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-16">Rank</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Author</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">5yr XIRR*</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">3yr XIRR*</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">1yr XIRR*</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Picks</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Best Pick</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider w-12"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {sortedInvestors.map((investor, index) => (
-                <React.Fragment key={investor.id}>
-                  <tr
-                    className={`hover:bg-slate-50 cursor-pointer transition-colors ${
-                      expandedRow === investor.id ? 'bg-blue-50' : ''
-                    }`}
-                    onClick={() => setExpandedRow(expandedRow === investor.id ? null : investor.id)}
-                  >
-                    <td className="px-4 py-4">
-                      <RankBadge rank={index + 1} />
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-sm font-bold text-slate-600">
-                          {investor.username.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-slate-900">{investor.username}</div>
-                          <div className="text-xs text-slate-500">Active {investor.lastActive}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <XIRRBadge value={investor.xirr5yr} />
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <XIRRBadge value={investor.xirr3yr} />
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <XIRRBadge value={investor.xirr1yr} />
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="text-sm font-medium text-slate-700">{investor.totalPicks}</span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <div className="inline-flex items-center gap-1">
-                        <span className="font-mono text-sm font-medium text-slate-900">{investor.bestPick.name}</span>
-                        <ReturnBadge value={investor.bestPick.return} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      {expandedRow === investor.id ? (
-                        <ChevronUp size={18} className="text-slate-400" />
-                      ) : (
-                        <ChevronDown size={18} className="text-slate-400" />
-                      )}
-                    </td>
-                  </tr>
-
-                  {/* Expanded Row */}
-                  {expandedRow === investor.id && (
-                    <tr className="bg-slate-50">
-                      <td colSpan={9} className="px-4 py-4">
-                        <div className="ml-16">
-                          <div className="flex items-center gap-2 mb-3">
-                            <h4 className="text-sm font-semibold text-slate-700">Recent Recommendations</h4>
-                            <a
-                              href="#"
-                              className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                            >
-                              View on VIC <ExternalLink size={10} />
-                            </a>
+          {loading ? (
+            <LoadingSpinner />
+          ) : error ? (
+            <ErrorMessage error={error} onRetry={() => window.location.reload()} />
+          ) : investors.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-16">Rank</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Author</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">5yr XIRR*</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">3yr XIRR*</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">1yr XIRR*</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Picks</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Best Pick</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider w-12"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {investors.map((investor, index) => (
+                  <React.Fragment key={investor.id}>
+                    <tr
+                      className={`hover:bg-slate-50 cursor-pointer transition-colors ${
+                        expandedRow === investor.username ? 'bg-blue-50' : ''
+                      }`}
+                      onClick={() => setExpandedRow(expandedRow === investor.username ? null : investor.username)}
+                    >
+                      <td className="px-4 py-4">
+                        <RankBadge rank={index + 1} />
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-sm font-bold text-slate-600">
+                            {investor.username?.charAt(0)?.toUpperCase() || '?'}
                           </div>
-                          <div className="grid grid-cols-4 gap-3">
-                            {investor.recentPicks.map((pick, i) => (
-                              <div key={i} className="bg-white rounded-lg border border-slate-200 p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-1">
-                                    <span className="font-mono font-bold text-slate-900">{pick.ticker}</span>
-                                    {pick.type === "short" && (
-                                      <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">SHORT</span>
-                                    )}
-                                  </div>
-                                  <ReturnBadge value={pick.return} type={pick.type} />
-                                </div>
-                                <div className="text-xs text-slate-500 space-y-1">
-                                  <div>Rec'd: {pick.date}</div>
-                                  <div>Entry: ${pick.priceAtRec.toFixed(2)}</div>
-                                  <div>Current: ${pick.currentPrice.toFixed(2)}</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-3 flex items-center gap-6 text-xs text-slate-500">
-                            <span className="flex items-center gap-1">
-                              <Target size={12} />
-                              {investor.totalPicks} total picks analyzed
-                            </span>
+                          <div>
+                            <div className="font-semibold text-slate-900">{investor.username}</div>
+                            <div className="text-xs text-slate-500">
+                              {investor.totalPicks || 0} picks
+                            </div>
                           </div>
                         </div>
                       </td>
+                      <td className="px-4 py-4 text-center">
+                        <XIRRBadge value={investor.xirr5yr} />
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <XIRRBadge value={investor.xirr3yr} />
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <XIRRBadge value={investor.xirr1yr} />
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <span className="text-sm font-medium text-slate-700">{investor.totalPicks || 0}</span>
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        {investor.bestPickTicker ? (
+                          <div className="inline-flex items-center gap-1">
+                            <span className="font-mono text-sm font-medium text-slate-900">{investor.bestPickTicker}</span>
+                            <ReturnBadge value={investor.bestPickReturn} />
+                          </div>
+                        ) : (
+                          <span className="text-sm text-slate-400">N/A</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        {expandedRow === investor.username ? (
+                          <ChevronUp size={18} className="text-slate-400" />
+                        ) : (
+                          <ChevronDown size={18} className="text-slate-400" />
+                        )}
+                      </td>
                     </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+
+                    {/* Expanded Row */}
+                    {expandedRow === investor.username && (
+                      <ExpandedRow username={investor.username} />
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Footer Note */}
@@ -420,7 +351,7 @@ export default function VICLeaderboard() {
             Authors may have sold at different prices.
           </p>
           <p className="text-xs text-slate-500 text-center mt-2">
-            Data sourced from valueinvestorsclub.com | Prices updated daily via market data APIs
+            Data sourced from valueinvestorsclub.com | Prices updated daily via Yahoo Finance
           </p>
         </div>
       </main>

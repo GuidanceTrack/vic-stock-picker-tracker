@@ -37,113 +37,86 @@ export async function scrapeAuthorProfile(page, author) {
     // Wait a bit for dynamic content
     await page.waitForTimeout(2000);
 
-    const selectors = config.selectors.profile;
-
-    // Extract ideas from the profile page
-    const ideas = await page.evaluate((sel) => {
+    // Extract ideas from the profile page (VIC-specific selectors)
+    const ideas = await page.evaluate(() => {
         const results = [];
+        const rows = document.querySelectorAll('table tr');
 
-        // Try multiple possible selectors for idea rows
-        const rowSelectors = sel.ideaRow.split(', ');
-        let rows = [];
+        // Skip header row
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
 
-        for (const rowSel of rowSelectors) {
-            rows = document.querySelectorAll(rowSel);
-            if (rows.length > 0) break;
-        }
-
-        console.log(`Found ${rows.length} idea rows`);
-
-        rows.forEach((row, index) => {
             try {
-                // Extract ticker
-                const tickerSelectors = sel.ticker.split(', ');
+                // Get idea ID from bookmark span with data-iid attribute
+                const bookmark = row.querySelector('[data-iid]');
+                const ideaId = bookmark ? bookmark.getAttribute('data-iid') : null;
+                if (!ideaId) continue;
+
+                // Get link to idea page
+                const link = row.querySelector('a[href*="/idea/"]');
+                const ideaUrl = link ? link.href : null;
+                const companyName = link ? link.textContent.trim() : null;
+
+                // Get ticker - it appears right after the company name link
+                // The structure is: <a>COMPANY NAME</a> TICKER
+                // Find the parent span (vich1) or container that has both
                 let ticker = null;
-                for (const tickerSel of tickerSelectors) {
-                    const tickerEl = row.querySelector(tickerSel);
-                    if (tickerEl) {
-                        ticker = tickerEl.textContent.trim().toUpperCase();
-                        break;
+                const tickerContainer = row.querySelector('.vich1, .col-sm-2');
+                if (tickerContainer && companyName) {
+                    const containerText = tickerContainer.textContent.trim();
+                    // Remove the company name to get just the ticker
+                    const afterCompany = containerText.replace(companyName, '').trim();
+                    // The ticker is the first word/token after removing company name
+                    const tickerMatch = afterCompany.match(/^([A-Z0-9.]+)/);
+                    if (tickerMatch) {
+                        ticker = tickerMatch[1].toUpperCase();
                     }
                 }
-
-                // Extract idea link
-                const linkSelectors = sel.ideaLink.split(', ');
-                let ideaUrl = null;
-                let ideaId = null;
-                for (const linkSel of linkSelectors) {
-                    const linkEl = row.querySelector(linkSel);
-                    if (linkEl) {
-                        ideaUrl = linkEl.href;
-                        // Extract idea ID from URL like /idea/COMPANY/123456
-                        const match = ideaUrl.match(/\/idea\/[^/]+\/(\d+)/);
-                        if (match) {
-                            ideaId = match[1];
-                        }
-                        break;
-                    }
+                // Fallback: try to extract from URL (e.g., /idea/ZILLOW_GROUP_INC/123)
+                if (!ticker && ideaUrl) {
+                    // Not reliable, skip this fallback
                 }
 
-                // Extract date
-                const dateSelectors = sel.date.split(', ');
+                // Check for short indicator - look for badge with 'S' or short-related classes
+                const shortBadge = row.querySelector('.badge-danger, .short-badge, [class*="short"]');
+                const rowHtml = row.innerHTML;
+                // Look for the small 'S' badge that indicates short position
+                const hasShortBadge = rowHtml.includes('badge') && rowHtml.includes('>S<');
+                const isShort = shortBadge !== null || hasShortBadge;
+
+                // Get date from cells - look for date pattern like "Sep 28, 2025"
                 let dateStr = null;
-                for (const dateSel of dateSelectors) {
-                    const dateEl = row.querySelector(dateSel);
-                    if (dateEl) {
-                        dateStr = dateEl.textContent.trim();
-                        // Also check datetime attribute
-                        if (dateEl.getAttribute('datetime')) {
-                            dateStr = dateEl.getAttribute('datetime');
-                        }
-                        break;
+                const allCells = row.querySelectorAll('td');
+                allCells.forEach(c => {
+                    const text = c.textContent.trim();
+                    const dateMatch = text.match(/[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}/);
+                    if (dateMatch) {
+                        dateStr = dateMatch[0];
                     }
-                }
+                });
 
-                // Check if short position
-                const positionSelectors = sel.positionType.split(', ');
-                let positionType = 'long';
-                for (const posSel of positionSelectors) {
-                    const posEl = row.querySelector(posSel);
-                    if (posEl) {
-                        const text = posEl.textContent.toLowerCase();
-                        if (text.includes('short')) {
-                            positionType = 'short';
-                        }
-                        break;
-                    }
-                }
-                // Also check row classes
-                if (row.classList.contains('short')) {
-                    positionType = 'short';
-                }
-
-                // Check if contest winner
-                const winnerSelectors = sel.contestWinner.split(', ');
-                let isContestWinner = false;
-                for (const winSel of winnerSelectors) {
-                    if (row.querySelector(winSel)) {
-                        isContestWinner = true;
-                        break;
-                    }
-                }
+                // Check for contest winner badge
+                const winnerBadge = row.querySelector('.winner, .contest-winner, .winner-badge, [class*="winner"]');
+                const isContestWinner = winnerBadge !== null;
 
                 if (ticker && ideaId) {
                     results.push({
                         ticker,
+                        companyName,
                         ideaUrl,
                         vicIdeaId: ideaId,
                         postedDate: dateStr,
-                        positionType,
+                        positionType: isShort ? 'short' : 'long',
                         isContestWinner
                     });
                 }
             } catch (err) {
-                console.error(`Error parsing row ${index}:`, err);
+                // Skip rows that can't be parsed
             }
-        });
+        }
 
         return results;
-    }, selectors);
+    });
 
     console.log(`Found ${ideas.length} ideas for ${author.username}`);
 

@@ -27,76 +27,62 @@ export async function scrapeIdeaPage(page, ideaUrl) {
     // Wait for content to load
     await page.waitForTimeout(2000);
 
-    const selectors = config.selectors.idea;
-
-    const ideaDetails = await page.evaluate((sel) => {
+    // Extract idea details from VIC idea page
+    const ideaDetails = await page.evaluate(() => {
         const result = {};
 
-        // Helper to try multiple selectors
-        const trySelectors = (selectorStr) => {
-            const selectors = selectorStr.split(', ');
-            for (const selector of selectors) {
-                const el = document.querySelector(selector);
-                if (el) {
-                    return el.textContent.trim();
+        // Extract ticker from page title (format: "Value Investors Club / COMPANY (TICKER)")
+        const title = document.title;
+        const tickerMatch = title.match(/\(([A-Z0-9.]+)\)$/);
+        if (tickerMatch) {
+            result.ticker = tickerMatch[1];
+        }
+
+        // Extract company name from h1 or title
+        const h1 = document.querySelector('h1');
+        if (h1) {
+            result.companyName = h1.textContent.trim();
+        }
+
+        // Find the stats table and extract Price and Market Cap
+        // The structure is: <td>Price:</td><td></td><td>79.49</td>
+        const rows = document.querySelectorAll('table tr');
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 3) {
+                const label = cells[0]?.textContent?.trim();
+
+                if (label === 'Price:') {
+                    const priceText = cells[2]?.textContent?.trim();
+                    if (priceText) {
+                        const price = parseFloat(priceText.replace(/[$,]/g, ''));
+                        if (!isNaN(price)) {
+                            result.priceAtRec = price;
+                        }
+                    }
+                }
+
+                if (label?.includes('Market Cap')) {
+                    const mcapText = cells[2]?.textContent?.trim();
+                    if (mcapText) {
+                        const mcap = parseFloat(mcapText.replace(/[$,]/g, ''));
+                        if (!isNaN(mcap)) {
+                            // Value is in millions, convert to actual value
+                            result.marketCapAtRec = mcap * 1e6;
+                        }
+                    }
                 }
             }
-            return null;
-        };
+        });
 
-        // Extract ticker
-        result.ticker = trySelectors(sel.ticker);
-
-        // Extract company name
-        result.companyName = trySelectors(sel.companyName);
-
-        // Extract price at recommendation
-        const priceText = trySelectors(sel.priceAtRec);
-        if (priceText) {
-            // Parse price like "$62.50" or "62.50"
-            const priceMatch = priceText.replace(/[$,]/g, '').match(/[\d.]+/);
-            if (priceMatch) {
-                result.priceAtRec = parseFloat(priceMatch[0]);
-            }
-        }
-
-        // Extract market cap
-        const mcapText = trySelectors(sel.marketCap);
-        if (mcapText) {
-            result.marketCapAtRec = parseMarketCap(mcapText);
-        }
-
-        // Extract position type
-        const posText = trySelectors(sel.positionType);
-        if (posText) {
-            result.positionType = posText.toLowerCase().includes('short') ? 'short' : 'long';
-        }
-
-        // Extract posted date
-        const dateEl = document.querySelector(sel.postedDate.split(', ')[0]);
-        if (dateEl) {
-            result.postedDate = dateEl.getAttribute('datetime') || dateEl.textContent.trim();
-        }
-
-        // Helper function to parse market cap strings
-        function parseMarketCap(text) {
-            const cleaned = text.replace(/[$,]/g, '').trim().toUpperCase();
-            const match = cleaned.match(/([\d.]+)\s*([BMT])?/);
-
-            if (!match) return null;
-
-            let value = parseFloat(match[1]);
-            const suffix = match[2];
-
-            if (suffix === 'B') value *= 1e9;
-            else if (suffix === 'M') value *= 1e6;
-            else if (suffix === 'T') value *= 1e12;
-
-            return value;
+        // Check for short position in the page
+        const pageText = document.body.innerText.toLowerCase();
+        if (pageText.includes('short position') || pageText.includes('position: short')) {
+            result.positionType = 'short';
         }
 
         return result;
-    }, selectors);
+    });
 
     // Also try to get data from page meta or structured data
     const additionalData = await extractStructuredData(page);
