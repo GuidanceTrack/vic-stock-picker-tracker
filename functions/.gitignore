@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+
+# Firebase service account key (NEVER commit this!)
+service-account-key.json
+*-service-account*.json
+
+# Session files (contain auth cookies)
+session/
+*.cookies.json
+
+# Test artifacts
+test-screenshot.png
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

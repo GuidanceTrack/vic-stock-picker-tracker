@@ -30,3 +30,14 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Firebase service account keys (NEVER commit!)
+**/service-account-key.json
+**/*-service-account*.json
+
+# Session files (contain auth cookies)
+**/session/
+*.cookies.json
+
+# Test artifacts
+test-screenshot.png

@@ -1,0 +1,42 @@
+{
+  "rateLimit": {
+    "minDelayMs": 3000,
+    "maxDelayMs": 7000,
+    "requestsPerMinute": 10
+  },
+  "urls": {
+    "base": "https://valueinvestorsclub.com",
+    "login": "https://valueinvestorsclub.com/login",
+    "memberProfile": "https://valueinvestorsclub.com/member/{username}/{userId}",
+    "idea": "https://valueinvestorsclub.com/idea/{companyName}/{ideaId}"
+  },
+  "selectors": {
+    "profile": {
+      "ideasTable": ".ideas-table, table.ideas, #ideas-list",
+      "ideaRow": "tr[data-idea-id], .idea-row, tbody tr",
+      "ticker": ".ticker, td:first-child a, .symbol",
+      "date": ".date, td.date, time",
+      "ideaLink": "a[href*='/idea/']",
+      "positionType": ".position-type, .long, .short",
+      "contestWinner": ".winner, .contest-winner, .winner-badge"
+    },
+    "idea": {
+      "ticker": ".ticker-symbol, h1 .ticker, .idea-header .symbol",
+      "companyName": ".company-name, h1, .idea-header h1",
+      "priceAtRec": ".price-at-rec, .entry-price, .recommendation-price",
+      "marketCap": ".market-cap, .mcap",
+      "positionType": ".position-type, .idea-type",
+      "postedDate": ".posted-date, .submission-date, time[datetime]",
+      "authorLink": "a[href*='/member/']"
+    },
+    "login": {
+      "emailInput": "input[name='email'], input[type='email'], #email",
+      "passwordInput": "input[name='password'], input[type='password'], #password",
+      "submitButton": "button[type='submit'], input[type='submit'], .login-button"
+    }
+  },
+  "session": {
+    "cookieFile": "./session/cookies.json",
+    "storageFile": "./session/storage.json"
+  }
+}

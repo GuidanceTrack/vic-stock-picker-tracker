@@ -267,32 +267,6 @@ export default function VICLeaderboard() {
         </div>
       </header>
 
-      {/* Disclaimer Banner */}
-      <DisclaimerBanner />
-
-      {/* Stats Banner */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="grid grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-slate-900">487</div>
-              <div className="text-xs text-slate-500">Authors Tracked</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-slate-900">3,241</div>
-              <div className="text-xs text-slate-500">Stock Picks Analyzed</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-600">+18.7%</div>
-              <div className="text-xs text-slate-500">Avg 5yr Simulated XIRR</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-slate-900">64%</div>
-              <div className="text-xs text-slate-500">Avg Win Rate</div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-6">
@@ -334,7 +308,6 @@ export default function VICLeaderboard() {
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">3yr XIRR*</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">1yr XIRR*</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Picks</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Win Rate</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Best Pick</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider w-12"></th>
               </tr>
@@ -373,17 +346,6 @@ export default function VICLeaderboard() {
                     </td>
                     <td className="px-4 py-4 text-center">
                       <span className="text-sm font-medium text-slate-700">{investor.totalPicks}</span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-green-500 rounded-full"
-                            style={{ width: `${investor.winRate}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium text-slate-700">{investor.winRate}%</span>
-                      </div>
                     </td>
                     <td className="px-4 py-4 text-center">
                       <div className="inline-flex items-center gap-1">
@@ -435,10 +397,6 @@ export default function VICLeaderboard() {
                             ))}
                           </div>
                           <div className="mt-3 flex items-center gap-6 text-xs text-slate-500">
-                            <span className="flex items-center gap-1">
-                              <Clock size={12} />
-                              Avg holding: {investor.avgHoldingPeriod}
-                            </span>
                             <span className="flex items-center gap-1">
                               <Target size={12} />
                               {investor.totalPicks} total picks analyzed
@@ -493,14 +451,6 @@ export default function VICLeaderboard() {
                 <p>
                   XIRR (Extended Internal Rate of Return) accounts for the timing of each investment.
                   It answers: "What annualized return would give us these results, given when each investment was made?"
-                </p>
-              </section>
-
-              <section>
-                <h3 className="font-semibold text-slate-900 mb-2">Win Rate</h3>
-                <p>
-                  Percentage of picks that are currently profitable (current price {'>'} recommendation price for longs,
-                  current price {'<'} recommendation price for shorts).
                 </p>
               </section>
 

@@ -1,0 +1,30 @@
+{
+  "name": "vic-leaderboard-functions",
+  "version": "1.0.0",
+  "description": "VIC Leaderboard scraper and cloud functions",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test:scrape": "node src/test-scraper.js",
+    "scrape": "node src/run-daily-scrape.js",
+    "test:prices": "node src/test-prices.js",
+    "test:metrics": "node src/test-metrics.js",
+    "update:prices": "node src/update-prices.js",
+    "update:metrics": "node src/update-metrics.js",
+    "seed": "node scripts/seed-authors.js",
+    "seed:ideas": "node scripts/seed-sample-ideas.js",
+    "save-session": "node src/scraper/save-session.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "playwright": "^1.40.0",
+    "yahoo-finance2": "^2.11.0",
+    "xirr": "^1.1.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

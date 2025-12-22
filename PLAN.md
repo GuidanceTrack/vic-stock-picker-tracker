@@ -701,27 +701,124 @@ functions.http('dailyScrape', async (req, res) => {
 
 ## Implementation Order
 
-### Step 1: Firebase Setup
-- [ ] Create Firebase project in console
-- [ ] Enable Firestore database
-- [ ] Set up security rules
-- [ ] Get Firebase config keys
+### Step 1: Firebase Setup ✅ (Completed Dec 21, 2025)
+- [x] Create Firebase project in console → `vic-leaderboard`
+- [x] Enable Firestore database → `nam5` region (US)
+- [x] Set up security rules → Deployed to production
+- [x] Get Firebase config keys → Saved to `firebase/firebase-config.json`
 
-### Step 2: Local Scraper Development
-- [ ] Set up /functions folder with Node.js
-- [ ] Create Playwright session manager
-- [ ] Build author profile scraper
-- [ ] Build idea page scraper
-- [ ] Test locally on 1-2 authors
+**Files created:**
+- `firebase/.firebaserc` - Project alias configuration
+- `firebase/firebase.json` - Firebase project config
+- `firebase/firestore.rules` - Security rules (public read, no public write)
+- `firebase/firestore.indexes.json` - Index configuration
+- `firebase/firebase-config.json` - SDK config keys
+- `frontend/.env.example` - Environment template for frontend
 
-### Step 3: Data Pipeline
-- [ ] Integrate Yahoo Finance price fetching
-- [ ] Build XIRR calculation logic
-- [ ] Seed Firestore with 10-20 test authors manually
-- [ ] Verify data structure works
+### Step 2: Local Scraper Development ✅ (Completed Dec 22, 2025)
+- [x] Set up /functions folder with Node.js
+- [x] Create Playwright session manager
+- [x] Build author profile scraper
+- [x] Build idea page scraper
+- [x] Test locally on 1-2 authors
+
+**What was done:**
+
+1. **Created `/functions` folder structure:**
+   ```
+   functions/
+   ├── package.json              # Dependencies: playwright, firebase-admin
+   ├── .env.example              # Template for credentials
+   ├── .gitignore                # Excludes secrets & session files
+   ├── service-account-key.json  # Firebase Admin credentials (gitignored)
+   ├── config/
+   │   └── scrape-config.json    # Rate limits, URLs, CSS selectors
+   ├── session/
+   │   ├── cookies.json          # VIC login cookies (gitignored)
+   │   └── storage.json          # Playwright storage state
+   ├── scripts/
+   │   └── seed-authors.js       # Populate initial author queue
+   └── src/
+       ├── index.js              # Main orchestrator (dailyScrape function)
+       ├── test-scraper.js       # Test script
+       ├── services/
+       │   └── firebase.js       # Firestore CRUD operations
+       └── scraper/
+           ├── session-manager.js # VIC login & cookie handling
+           ├── save-session.js    # Interactive login script
+           ├── author-scraper.js  # Scrape author profiles
+           ├── idea-scraper.js    # Scrape individual ideas
+           └── rate-limiter.js    # Delays between requests (3-7s random)
+   ```
+
+2. **Installed dependencies:**
+   - `playwright` - Browser automation for scraping
+   - `firebase-admin` - Server-side Firestore access
+   - Installed Chromium browser for Playwright
+
+3. **VIC Session Management:**
+   - Cloudflare blocks automated logins (CAPTCHA)
+   - Solution: Manual login via Firefox → export cookies via Cookie-Editor extension
+   - Cookies saved to `functions/session/cookies.json`
+   - Session tested and working
+
+4. **Seeded 10 real VIC authors to Firestore:**
+   - michael99, charlie479, mack885, devo791, Motherlode
+   - newman9, JackBlack, onodacapital, falcon44, rosco37
+   - Found via web search of public VIC member URLs
+
+5. **Test Results:**
+   - Successfully accessed `michael99` profile page with saved cookies
+   - Scraped 17 ideas from their profile
+   - Extracted: ticker, ideaId, URL for each idea
+
+**Note on VIC scraping policy:**
+- `robots.txt` allows all crawling (no restrictions)
+- Cloudflare protection blocks automated logins
+- Workaround: Use manually-exported browser cookies
+
+### Step 3: Data Pipeline ✅ (Completed Dec 22, 2025)
+- [x] Integrate Yahoo Finance price fetching
+- [x] Build XIRR calculation logic
+- [x] Seed Firestore with sample ideas (13 ideas across 5 authors)
+- [x] Verify data structure works
+
+**What was done:**
+
+1. **Created Price Service** (`functions/src/services/price-service.js`):
+   - Uses `yahoo-finance2` for fetching stock prices
+   - `getCurrentPrice(ticker)` - get latest price
+   - `getPriceOnDate(ticker, date)` - get historical price
+   - `updateAllPrices()` - batch update all tickers from ideas collection
+   - Prices cached in Firestore `prices` collection
+
+2. **Created Performance Calculator** (`functions/src/services/performance-calculator.js`):
+   - Uses `xirr` package for XIRR calculation
+   - `calculateAuthorMetrics(username)` - calculate metrics for one author
+   - `calculateAllAuthorMetrics()` - calculate for all authors
+   - `getLeaderboard(sortBy, limit)` - retrieve sorted leaderboard
+   - Results saved to Firestore `authorMetrics` collection
+
+3. **Created Test/Update Scripts**:
+   - `npm run test:prices` - test price fetching
+   - `npm run test:metrics` - test metrics calculation
+   - `npm run update:prices` - update all prices from Yahoo Finance
+   - `npm run update:metrics` - recalculate all author metrics
+   - `npm run seed:ideas` - seed sample ideas for testing
+
+4. **Verified End-to-End Pipeline**:
+   - Sample ideas seeded with real tickers (AAPL, GOOGL, MSFT, etc.)
+   - Prices fetched successfully from Yahoo Finance
+   - XIRR calculated correctly for all authors
+   - Leaderboard shows ranked results:
+     - #1 mack885: 33.5% XIRR (3 picks)
+     - #2 charlie479: 29.2% XIRR (3 picks)
+     - #3 michael99: 23.7% XIRR (3 picks)
+     - #4 devo791: 13.2% XIRR (2 picks)
+     - #5 Motherlode: -2.4% XIRR (2 picks)
 
 ### Step 4: Frontend Integration
-- [ ] Set up Vite + React + Tailwind project
+- [x] Set up Vite + React + Tailwind project *(prototype created)*
 - [ ] Add Firebase SDK to frontend
 - [ ] Migrate vic-leaderboard.jsx to use Firestore
 - [ ] Add loading states and error handling
@@ -742,56 +839,74 @@ functions.http('dailyScrape', async (req, res) => {
 
 ---
 
-## File Structure (Final)
+## File Structure (Current)
 
 ```
 vic-leaderboard/
-├── PLAN.md                    # This file
+├── PLAN.md                    # This file (project documentation)
+├── .gitignore                 # Excludes secrets, node_modules, session files
 ├── vic-leaderboard.jsx        # Original UI reference
-├── firebase.json              # Firebase config
-├── firestore.rules            # Security rules
-├── .firebaserc                # Firebase project settings
 │
-├── /functions                 # Google Cloud Functions
-│   ├── package.json
-│   ├── index.js               # Function exports
-│   ├── /src
-│   │   ├── dailyScrape.js     # Daily author scraper
-│   │   ├── updatePrices.js    # Price fetcher
-│   │   ├── calculateMetrics.js # XIRR calculator
-│   │   ├── /scraper
-│   │   │   ├── session-manager.js
-│   │   │   ├── author-scraper.js
-│   │   │   ├── idea-scraper.js
-│   │   │   └── parser.js
-│   │   └── /services
-│   │       ├── firebase.js    # Firestore helpers
-│   │       ├── yahoo-finance.js
-│   │       └── xirr.js
-│   └── /config
-│       └── selectors.json     # CSS selectors for scraping
+├── /firebase                  # Firebase configuration (✅ created Dec 21)
+│   ├── .firebaserc            # Firebase project settings
+│   ├── firebase.json          # Firebase config
+│   ├── firebase-config.json   # SDK config keys
+│   ├── firestore.rules        # Security rules
+│   └── firestore.indexes.json # Index configuration
 │
-├── /frontend
+├── /functions                 # Scraper & Cloud Functions (✅ created Dec 22)
+│   ├── package.json           # Dependencies: playwright, firebase-admin
+│   ├── package-lock.json
+│   ├── .env.example           # Template for credentials
+│   ├── .gitignore             # Excludes service account, session, etc.
+│   ├── service-account-key.json  # Firebase Admin key (gitignored!)
+│   │
+│   ├── /config
+│   │   └── scrape-config.json # Rate limits, URLs, CSS selectors
+│   │
+│   ├── /session               # VIC login session (gitignored!)
+│   │   ├── cookies.json       # Exported from Firefox Cookie-Editor
+│   │   └── storage.json       # Playwright storage state
+│   │
+│   ├── /scripts
+│   │   ├── seed-authors.js       # Populate initial author queue
+│   │   └── seed-sample-ideas.js  # Seed sample ideas for testing
+│   │
+│   └── /src
+│       ├── index.js              # Main entry: dailyScrape(), scrapeAuthor()
+│       ├── run-daily-scrape.js   # Run daily scrape script
+│       ├── test-scraper.js       # Test scraper connectivity
+│       ├── test-prices.js        # Test price service
+│       ├── test-metrics.js       # Test metrics calculator
+│       ├── update-prices.js      # Update all prices script
+│       ├── update-metrics.js     # Update all metrics script
+│       │
+│       ├── /scraper
+│       │   ├── session-manager.js    # Cookie/session handling
+│       │   ├── save-session.js       # Interactive login helper
+│       │   ├── author-scraper.js     # Scrape author profile pages
+│       │   ├── idea-scraper.js       # Scrape individual idea pages
+│       │   └── rate-limiter.js       # Random delays (3-7s)
+│       │
+│       └── /services
+│           ├── firebase.js           # Firestore CRUD operations
+│           ├── price-service.js      # Yahoo Finance price fetching
+│           └── performance-calculator.js  # XIRR & metrics
+│
+├── /frontend                  # React UI (✅ prototype created Dec 21)
 │   ├── package.json
 │   ├── vite.config.js
 │   ├── tailwind.config.js
 │   ├── index.html
+│   ├── .env.example           # Firebase client config template
 │   └── /src
 │       ├── App.jsx
 │       ├── main.jsx
-│       ├── firebase.js        # Firebase client init
-│       ├── /components
-│       │   ├── Leaderboard.jsx
-│       │   ├── AuthorRow.jsx
-│       │   └── StatsBar.jsx
-│       ├── /hooks
-│       │   └── useLeaderboard.js  # Firestore listener
-│       └── /services
-│           └── firestore.js   # Firestore queries
+│       └── /components
+│           └── VICLeaderboard.jsx  # Main leaderboard component
 │
-└── /scripts
-    ├── seed-authors.js        # Initial author discovery (run locally)
-    └── backfill-prices.js     # Backfill historical prices (run locally)
+└── /scripts                   # (planned - not yet created)
+    └── backfill-prices.js     # Backfill historical prices
 ```
 
 ---
@@ -880,21 +995,121 @@ We will build this as a **"Stock-Picking Tracker"** (not a "Performance Tracker"
    - Methodology modal explaining limitations
    - Footer disclaimer on all pages
 
-### UI Disclaimers Implemented
+### UI Prototype Status (Dec 21, 2025)
 
-The prototype includes these disclaimer elements:
+**Prototype running at:** `http://localhost:5174` (frontend folder)
 
-1. **Header**: Renamed to "VIC Stock-Picking Tracker" (not "Performance Tracker")
-2. **Amber Warning Banner**: Expandable disclaimer explaining:
-   - Returns are hypothetical buy-and-hold calculations
-   - Not actual trading results
-   - Example of how real vs simulated can differ
-3. **Table Headers**: XIRR columns marked with asterisks
-4. **Methodology Modal**: Full explanation of calculation methods and limitations
-5. **Footer**: Reiterates simulated nature of data
+**Tech stack:** React + Vite + Tailwind CSS
+
+#### Current UI Elements:
+
+1. **Header**: "VIC Stock-Picking Tracker" with methodology button
+2. **Filter Bar**: Sort by 1yr/3yr/5yr XIRR, benchmark reference (S&P 500)
+3. **Leaderboard Table**:
+   - Rank (with medals for top 3)
+   - Author name + last active
+   - 5yr/3yr/1yr XIRR* (asterisk indicates simulated)
+   - Total picks count
+   - Best pick with return badge
+   - Expandable rows showing recent recommendations
+4. **Methodology Modal**: Explains XIRR calculation and limitations
+5. **Footer Disclaimer**: Clarifies simulated nature of returns
+
+#### Removed Elements (intentionally simplified):
+
+1. ~~Stats Banner~~ - Too much information upfront
+2. ~~Amber Warning Banner~~ - Too prominent, footer disclaimer sufficient
+3. ~~Win Rate column~~ - Misleading metric (point-in-time snapshot, ignores magnitude)
+4. ~~Avg Holding Period~~ - Cannot calculate without exit data
+
+#### Metrics Being Tracked:
+
+| Metric | Description | Status |
+|--------|-------------|--------|
+| XIRR (1yr/3yr/5yr) | Simulated annualized return assuming buy-and-hold | ✅ Keep |
+| Total Picks | Number of recommendations by author | ✅ Keep |
+| Best Pick | Highest returning recommendation | ✅ Keep |
+| Win Rate | % of picks currently profitable | ❌ Removed |
+| Avg Holding Period | Average time positions held | ❌ Removed (no exit data) |
 
 ### Resolution
 
 - [x] Decision made on how to proceed
 - [x] Plan updated to reflect new framing/disclaimers
 - [x] UI prototype created with disclaimer elements
+- [x] Simplified UI based on feedback (removed misleading metrics)
+
+---
+
+## 📊 Current Status Summary (Dec 22, 2025)
+
+### What's Complete
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Firebase Project | ✅ Done | `vic-leaderboard` project, Firestore in `nam5` region |
+| Security Rules | ✅ Done | Public read, server-only write |
+| Scraper Module | ✅ Done | Playwright-based, session working with VIC |
+| VIC Session | ✅ Done | Cookies exported from Firefox, tested working |
+| Author Seeding | ✅ Done | 10 real VIC authors in Firestore |
+| Price Service | ✅ Done | Yahoo Finance integration working |
+| XIRR Calculator | ✅ Done | Performance metrics calculating correctly |
+| Sample Data | ✅ Done | 13 ideas across 5 authors, all with prices |
+| Frontend Prototype | ✅ Done | React + Vite + Tailwind at localhost:5174 |
+
+### What's Next (Step 4: Frontend Integration)
+
+1. **Add Firebase SDK to frontend** - Connect React app to Firestore
+2. **Migrate vic-leaderboard.jsx** - Replace mock data with real Firestore data
+3. **Add loading states** - Handle async data fetching
+4. **Deploy to Vercel** - Production deployment
+
+### Key Files to Know
+
+| File | Purpose |
+|------|---------|
+| `functions/scripts/seed-authors.js` | Add new authors to scrape queue |
+| `functions/scripts/seed-sample-ideas.js` | Add sample ideas for testing |
+| `functions/src/index.js` | Main scraper entry point |
+| `functions/src/services/price-service.js` | Yahoo Finance price fetching |
+| `functions/src/services/performance-calculator.js` | XIRR & metrics calculation |
+| `functions/session/cookies.json` | VIC login (refresh if expired) |
+| `functions/service-account-key.json` | Firebase Admin auth (never commit!) |
+
+### How to Run
+
+```bash
+# Seed authors to Firestore
+cd functions && npm run seed
+
+# Seed sample ideas for testing
+cd functions && npm run seed:ideas
+
+# Update all prices from Yahoo Finance
+cd functions && npm run update:prices
+
+# Calculate metrics for all authors
+cd functions && npm run update:metrics
+
+# Test scraper connectivity
+cd functions && npm run test:scrape
+
+# Run frontend
+cd frontend && npm run dev
+```
+
+### Current Leaderboard (Sample Data)
+
+| Rank | Author | 5yr XIRR | Picks |
+|------|--------|----------|-------|
+| 1 | mack885 | 33.5% | 3 |
+| 2 | charlie479 | 29.2% | 3 |
+| 3 | michael99 | 23.7% | 3 |
+| 4 | devo791 | 13.2% | 2 |
+| 5 | Motherlode | -2.4% | 2 |
+
+### Sensitive Files (gitignored)
+
+- `functions/service-account-key.json` - Firebase Admin credentials
+- `functions/session/*` - VIC login cookies
+- `.env` files - Environment variables
