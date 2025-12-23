@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -89,35 +89,204 @@ export async function createAuthenticatedContext(browser) {
 }
 
 /**
+ * Session status constants
+ */
+export const SessionStatus = {
+    LOGGED_IN: 'LOGGED_IN',
+    EXPIRED: 'EXPIRED',
+    CLOUDFLARE_BLOCKED: 'CLOUDFLARE_BLOCKED',
+    UNKNOWN: 'UNKNOWN'
+};
+
+/**
+ * Get detailed session health information
+ */
+export function getSessionHealth() {
+    if (!hasStoredSession()) {
+        return {
+            status: 'NO_SESSION',
+            hasSession: false,
+            cookies: null,
+            age: null,
+            expiresIn: null
+        };
+    }
+
+    try {
+        const cookies = JSON.parse(readFileSync(COOKIES_FILE, 'utf8'));
+        const storage = JSON.parse(readFileSync(STORAGE_FILE, 'utf8'));
+
+        // Find key authentication cookies
+        const vicSession = cookies.find(c => c.name === 'vic_session');
+        const rememberToken = cookies.find(c => c.name.startsWith('remember_web_'));
+        const cfClearance = cookies.find(c => c.name === 'cf_clearance' || c.name === '__cf_bm');
+
+        // Calculate session age and expiration
+        const now = Date.now() / 1000; // Convert to seconds
+
+        let oldestExpiry = null;
+        let cookieExpiries = [];
+
+        for (const cookie of cookies) {
+            if (cookie.expires && cookie.expires > 0) {
+                cookieExpiries.push({
+                    name: cookie.name,
+                    expires: cookie.expires,
+                    expiresIn: cookie.expires - now
+                });
+
+                if (!oldestExpiry || cookie.expires < oldestExpiry) {
+                    oldestExpiry = cookie.expires;
+                }
+            }
+        }
+
+        // Determine session age (from file modification time)
+        const stats = statSync(COOKIES_FILE);
+        const sessionAge = (Date.now() - stats.mtimeMs) / 1000; // in seconds
+
+        const expiresIn = oldestExpiry ? (oldestExpiry - now) : null;
+
+        return {
+            status: expiresIn && expiresIn < 0 ? 'EXPIRED' : 'VALID',
+            hasSession: true,
+            cookies: {
+                total: cookies.length,
+                vicSession: !!vicSession,
+                rememberToken: !!rememberToken,
+                cfClearance: !!cfClearance,
+                expiries: cookieExpiries.sort((a, b) => a.expiresIn - b.expiresIn)
+            },
+            age: {
+                seconds: sessionAge,
+                hours: sessionAge / 3600,
+                days: sessionAge / 86400
+            },
+            expiresIn: expiresIn ? {
+                seconds: expiresIn,
+                hours: expiresIn / 3600,
+                days: expiresIn / 86400,
+                timestamp: new Date(oldestExpiry * 1000).toISOString()
+            } : null
+        };
+    } catch (error) {
+        console.error('Error reading session health:', error.message);
+        return {
+            status: 'ERROR',
+            hasSession: true,
+            error: error.message
+        };
+    }
+}
+
+/**
+ * Log session health to console
+ */
+export function logSessionHealth() {
+    const health = getSessionHealth();
+
+    console.log('\n=== Session Health ===');
+    console.log(`Status: ${health.status}`);
+
+    if (health.hasSession) {
+        console.log(`Total Cookies: ${health.cookies?.total || 'N/A'}`);
+        console.log(`VIC Session: ${health.cookies?.vicSession ? 'Yes' : 'No'}`);
+        console.log(`Remember Token: ${health.cookies?.rememberToken ? 'Yes' : 'No'}`);
+        console.log(`Cloudflare Clearance: ${health.cookies?.cfClearance ? 'Yes' : 'No'}`);
+
+        if (health.age) {
+            console.log(`Session Age: ${health.age.days.toFixed(2)} days (${health.age.hours.toFixed(1)} hours)`);
+        }
+
+        if (health.expiresIn) {
+            if (health.expiresIn.seconds > 0) {
+                console.log(`Expires In: ${health.expiresIn.days.toFixed(2)} days (${health.expiresIn.hours.toFixed(1)} hours)`);
+                console.log(`Expiration Time: ${health.expiresIn.timestamp}`);
+            } else {
+                console.log(`⚠️  Session EXPIRED ${Math.abs(health.expiresIn.hours).toFixed(1)} hours ago`);
+            }
+        } else {
+            console.log('Expiration: Unknown (no expiry timestamps found)');
+        }
+
+        if (health.cookies?.expiries && health.cookies.expiries.length > 0) {
+            console.log('\nNext Expiring Cookies:');
+            health.cookies.expiries.slice(0, 5).forEach(cookie => {
+                const status = cookie.expiresIn > 0 ? `in ${(cookie.expiresIn / 3600).toFixed(1)}h` : `${Math.abs(cookie.expiresIn / 3600).toFixed(1)}h ago`;
+                console.log(`  - ${cookie.name}: ${status}`);
+            });
+        }
+    } else {
+        console.log('No session found');
+    }
+
+    console.log('=====================\n');
+
+    return health;
+}
+
+/**
  * Check if currently logged in by looking for auth indicators
+ * Returns detailed status instead of just boolean
  */
 export async function isLoggedIn(page) {
     try {
         // Navigate to a page that requires auth
-        await page.goto(config.urls.base, { waitUntil: 'networkidle' });
+        await page.goto(config.urls.base, { waitUntil: 'networkidle', timeout: 30000 });
+
+        // Check for Cloudflare challenge page
+        const pageContent = await page.content();
+        const isCloudflare = pageContent.includes('Checking your browser') ||
+                            pageContent.includes('cloudflare') ||
+                            await page.$('#challenge-running, .cf-browser-verification');
+
+        if (isCloudflare) {
+            console.log('⚠️  Cloudflare challenge detected');
+            return SessionStatus.CLOUDFLARE_BLOCKED;
+        }
 
         // Check for login indicators - adjust these selectors based on actual VIC site
         const logoutButton = await page.$('a[href*="logout"], .logout, button:has-text("Log out")');
         const loginButton = await page.$('a[href*="login"], .login, button:has-text("Log in")');
 
         if (logoutButton) {
-            console.log('Session is valid - user is logged in');
-            return true;
+            console.log('✓ Session is valid - user is logged in');
+            return SessionStatus.LOGGED_IN;
         }
 
         if (loginButton) {
-            console.log('Session expired - login button visible');
-            return false;
+            console.log('✗ Session expired - login button visible');
+            return SessionStatus.EXPIRED;
         }
 
         // Fallback: check for member-only content
         const memberContent = await page.$('.member-content, .ideas-list, [data-member]');
-        return !!memberContent;
+        if (memberContent) {
+            console.log('✓ Session appears valid - member content visible');
+            return SessionStatus.LOGGED_IN;
+        }
+
+        console.log('? Could not determine login status');
+        return SessionStatus.UNKNOWN;
 
     } catch (error) {
         console.error('Error checking login status:', error.message);
-        return false;
+
+        // Check if it's a timeout or navigation error (might indicate Cloudflare)
+        if (error.message.includes('timeout') || error.message.includes('net::ERR')) {
+            return SessionStatus.CLOUDFLARE_BLOCKED;
+        }
+
+        return SessionStatus.UNKNOWN;
     }
+}
+
+/**
+ * Check if currently logged in (backwards compatible boolean version)
+ */
+export async function checkLoginStatus(page) {
+    const status = await isLoggedIn(page);
+    return status === SessionStatus.LOGGED_IN;
 }
 
 /**

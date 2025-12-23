@@ -870,18 +870,83 @@ functions.http('dailyScrape', async (req, res) => {
 - `frontend/.env` - Firebase config (gitignored)
 - `frontend/.gitignore` - Added .env exclusion
 
-### Step 5: Cloud Functions
-- [ ] Deploy scraper as Cloud Function
-- [ ] Deploy price updater as Cloud Function
-- [ ] Deploy metrics calculator as Cloud Function
-- [ ] Test each function manually
+### Step 5: Cloud Functions ✅ (Completed Dec 23, 2025)
+- [x] Deploy scraper as Cloud Function
+- [x] Deploy price updater as Cloud Function
+- [x] Deploy metrics calculator as Cloud Function
+- [x] Deploy combined dailyUpdate function (prices + metrics)
+- [x] Test each function manually
 
-### Step 6: Automation
-- [ ] Set up Google Cloud Scheduler
-- [ ] Configure daily scrape job (2 AM)
-- [ ] Configure price update job (6 PM)
-- [ ] Configure metrics recalc job (6:30 PM)
-- [ ] Monitor for a week to ensure stability
+**What was done:**
+
+1. **Created Cloud Functions entry point** (`functions/index.js`):
+   - `dailyScrape` - Scrape one VIC author (⚠️ has Playwright browser issue)
+   - `dailyUpdate` - Combined function that updates prices + calculates metrics
+   - `updatePrices` - Manual trigger for price updates
+   - `calculateMetrics` - Manual trigger for metrics calculation
+
+2. **Deployed to Firebase Cloud Functions**:
+   - Runtime: Node.js 20
+   - All functions deployed successfully to `us-central1` region
+   - URLs:
+     - `https://us-central1-vic-leaderboard.cloudfunctions.net/dailyUpdate`
+     - `https://us-central1-vic-leaderboard.cloudfunctions.net/dailyScrape`
+     - `https://us-central1-vic-leaderboard.cloudfunctions.net/updatePrices`
+     - `https://us-central1-vic-leaderboard.cloudfunctions.net/calculateMetrics`
+
+3. **Test Results**:
+   - ✅ `dailyUpdate`: Successfully updated 5 tickers + processed 1 author (8 seconds)
+   - ✅ `updatePrices`: Successfully updated 5 tickers
+   - ✅ `calculateMetrics`: Successfully processed 1 author
+   - ❌ `dailyScrape`: Fails - Playwright browser not installed in Cloud Function environment
+
+**Note:** Combined `updatePrices` + `calculateMetrics` into single `dailyUpdate` function to reduce Cloud Scheduler job count from 3 to 2 (free tier allows 3 jobs total, user has 1 existing job for another project).
+
+### Step 6: Automation ✅ (Completed Dec 23, 2025)
+- [x] Install Google Cloud SDK + Python
+- [x] Authenticate gcloud with Google account
+- [x] Set up Google Cloud Scheduler
+- [x] Configure daily update job (prices + metrics at 6 PM)
+- [x] Configure daily scrape job (2 AM)
+- [x] Test scheduler jobs
+
+**What was done:**
+
+1. **Installed Infrastructure**:
+   - Python 3.12 (required for gcloud CLI)
+   - Google Cloud SDK 550.0.0
+   - Authenticated with firsthire44@gmail.com
+
+2. **Enabled Cloud Scheduler API**:
+   - Project: `vic-leaderboard`
+   - Region: `us-central1`
+
+3. **Created 2 Cloud Scheduler Jobs**:
+
+   **Job 1: `daily-update`**
+   - Schedule: `0 18 * * 1-5` (6:00 PM ET, weekdays only)
+   - Target: `dailyUpdate` Cloud Function
+   - Purpose: Update stock prices + calculate metrics
+   - Status: ✅ ENABLED and working
+   - Next run: Every weekday at 6 PM ET
+
+   **Job 2: `daily-scrape`**
+   - Schedule: `0 2 * * *` (2:00 AM ET, daily)
+   - Target: `dailyScrape` Cloud Function
+   - Purpose: Scrape one VIC author
+   - Status: ⚠️ ENABLED but will fail until Playwright issue fixed
+   - Next run: Every day at 2 AM ET
+
+4. **Tested Jobs**:
+   - Successfully triggered `daily-update` manually via gcloud
+   - Both jobs visible in Cloud Scheduler console
+   - Automatic execution confirmed working
+
+**Cost Analysis:**
+- Cloud Scheduler: 2 of 3 free jobs used (1 remaining)
+- Cloud Functions: ~60 invocations/month (2M free tier)
+- Firestore: ~50 reads/day (50K/day free tier)
+- **Total monthly cost: $0.00** ✅
 
 ---
 
@@ -900,9 +965,10 @@ vic-leaderboard/
 │   ├── firestore.rules        # Security rules
 │   └── firestore.indexes.json # Index configuration
 │
-├── /functions                 # Scraper & Cloud Functions (✅ created Dec 22)
-│   ├── package.json           # Dependencies: playwright, firebase-admin
+├── /functions                 # Scraper & Cloud Functions (✅ deployed Dec 23)
+│   ├── package.json           # Dependencies: playwright, firebase-admin, firebase-functions
 │   ├── package-lock.json
+│   ├── index.js               # Cloud Functions entry point (deployed)
 │   ├── .env.example           # Template for credentials
 │   ├── .gitignore             # Excludes service account, session, etc.
 │   ├── service-account-key.json  # Firebase Admin key (gitignored!)
@@ -1087,7 +1153,7 @@ We will build this as a **"Stock-Picking Tracker"** (not a "Performance Tracker"
 
 ---
 
-## 📊 Current Status Summary (Dec 22, 2025)
+## 📊 Current Status Summary (Dec 23, 2025)
 
 ### What's Complete
 
@@ -1095,29 +1161,59 @@ We will build this as a **"Stock-Picking Tracker"** (not a "Performance Tracker"
 |-----------|--------|-------|
 | Firebase Project | ✅ Done | `vic-leaderboard` project, Firestore in `nam5` region |
 | Security Rules | ✅ Done | Public read, server-only write |
-| Scraper Module | ✅ Done | Playwright-based, session working with VIC |
-| VIC Session | ✅ Done | Cookies exported from Firefox, tested working |
-| Author Seeding | ✅ Done | 10 real VIC authors in Firestore |
+| Scraper Module | ✅ Done | Playwright-based, VIC-specific selectors working |
+| VIC Session | ✅ Done | Cookies exported from browser, needs refresh periodically |
+| Author Seeding | ✅ Done | 10 real VIC authors in Firestore (queue for scraping) |
 | Price Service | ✅ Done | Yahoo Finance integration working |
 | XIRR Calculator | ✅ Done | Performance metrics calculating correctly |
-| Sample Data | ✅ Done | 13 ideas across 5 authors, all with prices |
-| Frontend Prototype | ✅ Done | React + Vite + Tailwind at localhost:5174 |
+| Real Data | ✅ Done | JackBlack: 5 ideas scraped with real prices |
+| Frontend Prototype | ✅ Done | React + Vite + Tailwind at localhost:5173 |
 | Frontend Firebase | ✅ Done | Firebase SDK integrated, real-time data fetching |
+| **Cloud Functions** | ✅ Done | 4 functions deployed (dailyUpdate, dailyScrape, updatePrices, calculateMetrics) |
+| **Cloud Scheduler** | ✅ Done | 2 automated jobs (daily-update, daily-scrape) |
 
-### What's Next (Step 5: Cloud Functions)
+### Current Data in Firestore (Real, Not Sample)
 
-1. **Deploy scraper as Cloud Function** - Automate daily author scraping
-2. **Deploy price updater as Cloud Function** - Automate daily price updates
-3. **Deploy metrics calculator as Cloud Function** - Automate metrics recalculation
-4. **Deploy to Vercel** - Production deployment of frontend
+**Author:** JackBlack
+- 5yr XIRR: 6.9%
+- 3yr XIRR: 6.9%
+- 1yr XIRR: -25%
+- 5 ideas with prices
+
+**Note:** Sample data has been deleted. Only real scraped data remains.
+
+### Automated Jobs (Running in Production)
+
+| Job | Schedule | Status | Next Action |
+|-----|----------|--------|-------------|
+| **daily-update** | 6:00 PM ET (weekdays) | ✅ Working | Automatically updates prices + metrics |
+| **daily-scrape** | 2:00 AM ET (daily) | ⚠️ Will fail | Needs Playwright browser fix |
+
+### What's Next
+
+**Priority 1: Fix dailyScrape Function**
+- Issue: Playwright browser not installed in Cloud Function environment
+- Options: Deploy to Cloud Run, add browser install to deployment, or use external service
+
+**Priority 2: Deploy Frontend to Vercel**
+1. Create Vercel account (free)
+2. Connect GitHub repo
+3. Deploy frontend folder
+4. Update environment variables with Firebase config
+5. Public leaderboard accessible
+
+**Priority 3: Scrape More Authors**
+- Run scraper locally to populate leaderboard with more data
+- 9 authors in queue ready to scrape
 
 ### Key Files to Know
 
 | File | Purpose |
 |------|---------|
+| `functions/index.js` | **Cloud Functions entry point (deployed)** |
+| `functions/src/index.js` | Main scraper code (dailyScrape logic) |
 | `functions/scripts/seed-authors.js` | Add new authors to scrape queue |
 | `functions/scripts/seed-sample-ideas.js` | Add sample ideas for testing |
-| `functions/src/index.js` | Main scraper entry point |
 | `functions/src/services/price-service.js` | Yahoo Finance price fetching |
 | `functions/src/services/performance-calculator.js` | XIRR & metrics calculation |
 | `functions/session/cookies.json` | VIC login (refresh if expired) |
@@ -1127,7 +1223,7 @@ We will build this as a **"Stock-Picking Tracker"** (not a "Performance Tracker"
 | `frontend/src/hooks/useLeaderboard.js` | Real-time leaderboard data hook |
 | `frontend/src/components/VICLeaderboard.jsx` | Main leaderboard UI component |
 
-### How to Run
+### How to Run Locally
 
 ```bash
 # Seed authors to Firestore
@@ -1149,15 +1245,38 @@ cd functions && npm run test:scrape
 cd frontend && npm run dev
 ```
 
-### Current Leaderboard (Sample Data)
+### Cloud Scheduler Commands
 
-| Rank | Author | 5yr XIRR | Picks |
-|------|--------|----------|-------|
-| 1 | mack885 | 33.5% | 3 |
-| 2 | charlie479 | 29.2% | 3 |
-| 3 | michael99 | 23.7% | 3 |
-| 4 | devo791 | 13.2% | 2 |
-| 5 | Motherlode | -2.4% | 2 |
+```bash
+# Set Python path for gcloud
+export CLOUDSDK_PYTHON="/c/Program Files/Python312/python.exe"
+
+# List all scheduler jobs
+/c/Users/garim/google-cloud-sdk/bin/gcloud scheduler jobs list --location=us-central1
+
+# Manually trigger daily update (prices + metrics)
+/c/Users/garim/google-cloud-sdk/bin/gcloud scheduler jobs run daily-update --location=us-central1
+
+# Manually trigger scraper
+/c/Users/garim/google-cloud-sdk/bin/gcloud scheduler jobs run daily-scrape --location=us-central1
+
+# Pause a job
+/c/Users/garim/google-cloud-sdk/bin/gcloud scheduler jobs pause daily-scrape --location=us-central1
+
+# Resume a job
+/c/Users/garim/google-cloud-sdk/bin/gcloud scheduler jobs resume daily-scrape --location=us-central1
+
+# View logs
+# Visit: https://console.cloud.google.com/functions/list?project=vic-leaderboard
+```
+
+### Current Leaderboard (Real Data)
+
+| Rank | Author | 5yr XIRR | 3yr XIRR | 1yr XIRR | Picks |
+|------|--------|----------|----------|----------|-------|
+| 1 | JackBlack | 6.9% | 6.9% | -25% | 5 |
+
+**Note:** Only one author with scraped data currently. 9 more authors in queue ready to scrape.
 
 ### Sensitive Files (gitignored)
 
@@ -1187,3 +1306,73 @@ cd frontend && npm run dev
 
 **Files Modified:**
 - `firebase/firestore.rules` - Added public read access to `prices` collection
+
+### Dec 22, 2025 - Scraper CSS Selector Fixes
+
+**Issue:** Scraper was finding 0 ideas from VIC author profiles, even though ideas were visible on the page.
+
+**Root Cause:** The CSS selectors in `scrape-config.json` were generic guesses and didn't match the actual VIC HTML structure.
+
+**VIC HTML Structure Discovered:**
+- Idea ID is in `data-iid` attribute on bookmark span: `<span data-iid="1950767659">`
+- Company name is in anchor: `<a href="/idea/COMPANY/ID">COMPANY NAME</a>`
+- Ticker appears after company name in the same cell: `COMPANY NAME TICKER`
+- Date is in format: `Sep 28, 2025`
+- Short position indicated by badge with `>S<` in HTML
+- Price info in stats table: `<td>Price:</td><td></td><td>79.49</td>`
+
+**Fix Applied:**
+1. Rewrote `author-scraper.js` with VIC-specific extraction logic:
+   - Extract idea ID from `[data-iid]` attribute
+   - Extract ticker by removing company name from cell text
+   - Parse date with regex: `/[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}/`
+   - Detect shorts by looking for `>S<` badge in row HTML
+
+2. Rewrote `idea-scraper.js` with VIC-specific extraction:
+   - Extract ticker from page title: `"Value Investors Club / COMPANY (TICKER)"`
+   - Extract price from stats table rows
+   - Extract market cap from stats table
+
+**Files Modified:**
+- `functions/src/scraper/author-scraper.js` - Complete rewrite of extraction logic
+- `functions/src/scraper/idea-scraper.js` - Complete rewrite for price extraction
+
+### Dec 22, 2025 - Real Data Scraping & Sample Data Cleanup
+
+**Action:** Scraped real data from VIC and deleted all sample/test data.
+
+**What was done:**
+1. Refreshed VIC session cookies (they had expired)
+2. Scraped JackBlack's profile - found 17 ideas
+3. Scraped 5 idea pages to get prices at recommendation:
+   - Z (Zillow) - $79.49 - Short
+   - CNI (Canadian National Railway) - $92.15 - Long
+   - NAVI (Navient) - $12.92 - Long
+   - OPEN (Opendoor) - $3.17 - Short
+   - HRB (H&R Block) - $63.64 - Short
+
+4. Deleted all sample data from Firestore:
+   - 13 sample ideas (fake tickers like AAPL, GOOGL, etc.)
+   - 5 sample author metrics
+   - 13 sample price entries
+
+5. Updated prices from Yahoo Finance for real tickers
+6. Recalculated metrics for JackBlack
+
+**Current State (Real Data Only):**
+
+| Author | 5yr XIRR | 3yr XIRR | 1yr XIRR | Picks |
+|--------|----------|----------|----------|-------|
+| JackBlack | 6.9% | 6.9% | -25% | 5 |
+
+**Ideas in Database:**
+
+| Ticker | Company | Date | Price at Rec | Position |
+|--------|---------|------|--------------|----------|
+| Z | Zillow Group Inc | Sep 28, 2025 | $79.49 | Short |
+| CNI | Canadian National Railway | Sep 24, 2025 | $92.15 | Long |
+| NAVI | Navient Corp | Sep 23, 2025 | $12.92 | Long |
+| OPEN | Opendoor Technologies | Aug 18, 2025 | $3.17 | Short |
+| HRB | H&R Block | Sep 30, 2024 | $63.64 | Short |
+
+**Note:** The 1yr XIRR is -25% because JackBlack's recent short positions (Z, OPEN, HRB) haven't worked out yet - the stocks haven't dropped as expected.

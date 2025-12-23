@@ -2,8 +2,7 @@
   "name": "vic-leaderboard-functions",
   "version": "1.0.0",
   "description": "VIC Leaderboard scraper and cloud functions",
-  "main": "src/index.js",
-  "type": "module",
+  "main": "index.js",
   "scripts": {
     "test:scrape": "node src/test-scraper.js",
     "scrape": "node src/run-daily-scrape.js",
@@ -13,10 +12,15 @@
     "update:metrics": "node src/update-metrics.js",
     "seed": "node scripts/seed-authors.js",
     "seed:ideas": "node scripts/seed-sample-ideas.js",
-    "save-session": "node src/scraper/save-session.js"
+    "save-session": "node src/scraper/save-session.js",
+    "check-session": "node src/scripts/check-session-health.js",
+    "test:refresh": "node src/scripts/test-auto-refresh.js",
+    "debug:motherlode": "node src/scripts/debug-motherlode.js"
   },
   "dependencies": {
+    "@google-cloud/functions-framework": "^3.3.0",
     "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0",
     "playwright": "^1.40.0",
     "yahoo-finance2": "^2.11.0",
     "xirr": "^1.1.0"
@@ -25,6 +29,6 @@
     "dotenv": "^16.3.1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }

@@ -21,7 +21,9 @@ import {
 import {
     createAuthenticatedContext,
     isLoggedIn,
-    hasStoredSession
+    hasStoredSession,
+    saveSession,
+    SessionStatus
 } from './scraper/session-manager.js';
 import { scrapeAuthorProfile } from './scraper/author-scraper.js';
 import { scrapeMultipleIdeas } from './scraper/idea-scraper.js';
@@ -64,10 +66,17 @@ export async function dailyScrape() {
         const page = await context.newPage();
 
         // Verify we're logged in
-        const loggedIn = await isLoggedIn(page);
-        if (!loggedIn) {
+        const loginStatus = await isLoggedIn(page);
+        if (loginStatus !== SessionStatus.LOGGED_IN) {
+            if (loginStatus === SessionStatus.CLOUDFLARE_BLOCKED) {
+                throw new Error('Cloudflare is blocking access. Session may need manual refresh.');
+            }
             throw new Error('Session expired. Run "npm run save-session" to log in again.');
         }
+
+        // Save session after successful login (persists any auto-refreshed cookies)
+        console.log('Saving refreshed session cookies...');
+        await saveSession(context);
 
         // Get existing ideas for this author
         const existingIdeas = await getIdeasByAuthor(author.username);
@@ -145,10 +154,16 @@ export async function scrapeAuthor(username, userId) {
         const context = await createAuthenticatedContext(browser);
         const page = await context.newPage();
 
-        const loggedIn = await isLoggedIn(page);
-        if (!loggedIn) {
+        const loginStatus = await isLoggedIn(page);
+        if (loginStatus !== SessionStatus.LOGGED_IN) {
+            if (loginStatus === SessionStatus.CLOUDFLARE_BLOCKED) {
+                throw new Error('Cloudflare is blocking access. Session may need manual refresh.');
+            }
             throw new Error('Session expired. Run "npm run save-session" to log in again.');
         }
+
+        // Save session after successful login
+        await saveSession(context);
 
         await waitRandom();
         const ideas = await scrapeAuthorProfile(page, author);
