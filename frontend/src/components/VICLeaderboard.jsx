@@ -1,7 +1,24 @@
-import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ExternalLink, Target, Clock, BarChart3, Info, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ExternalLink, Target, Clock, BarChart3, Info, Loader2, AlertCircle, Search, X } from 'lucide-react';
+import { usePaginatedLeaderboard } from '../hooks/usePaginatedLeaderboard';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useAuthor } from '../hooks/useAuthor';
+import Pagination from './Pagination';
+
+// Custom hook for debouncing
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 const XIRRBadge = ({ value }) => {
   if (value === null || value === undefined) {
@@ -40,7 +57,10 @@ const ReturnBadge = ({ value, type = "long" }) => {
   );
 };
 
-const RankBadge = ({ rank }) => {
+const RankBadge = ({ rank, isSearchResult = false }) => {
+  if (isSearchResult || rank === null || rank === undefined) {
+    return <span className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm text-slate-400">-</span>;
+  }
   if (rank === 1) return <span className="text-2xl">🥇</span>;
   if (rank === 2) return <span className="text-2xl">🥈</span>;
   if (rank === 3) return <span className="text-2xl">🥉</span>;
@@ -181,10 +201,44 @@ export default function VICLeaderboard() {
   const [expandedRow, setExpandedRow] = useState(null);
   const [timeFilter, setTimeFilter] = useState('5yr');
   const [showMethodology, setShowMethodology] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+
+  // Debounce search input to avoid excessive queries
+  const debouncedSearch = useDebounce(searchInput, 300);
+  const isSearching = debouncedSearch.trim() !== '';
 
   // Map filter to Firestore field name
   const sortField = `xirr${timeFilter}`;
-  const { data: investors, loading, error } = useLeaderboard(sortField, 50);
+
+  // Paginated data for normal view
+  const {
+    data: paginatedInvestors,
+    loading: paginatedLoading,
+    error: paginatedError,
+    currentPage,
+    totalPages,
+    totalCount,
+    pageSize,
+    goToPage
+  } = usePaginatedLeaderboard(sortField);
+
+  // Search results
+  const {
+    data: searchResults,
+    loading: searchLoading,
+    error: searchError
+  } = useLeaderboard(sortField, 50, debouncedSearch);
+
+  // Use search results when searching, otherwise paginated results
+  const investors = isSearching ? searchResults : paginatedInvestors;
+  const loading = isSearching ? searchLoading : paginatedLoading;
+  const error = isSearching ? searchError : paginatedError;
+
+  // Handle page change - close expanded row
+  const handlePageChange = (page) => {
+    setExpandedRow(null);
+    goToPage(page);
+  };
 
   // Get last updated date from first investor's calculatedAt
   const lastUpdated = investors[0]?.calculatedAt;
@@ -227,6 +281,35 @@ export default function VICLeaderboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-6">
+        {/* Search Bar */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); setExpandedRow(null); }}
+              placeholder="Search by author name..."
+              className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900 placeholder-slate-400"
+            />
+            {searchInput && (
+              <button
+                onClick={() => { setSearchInput(''); setExpandedRow(null); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            )}
+          </div>
+          {isSearching && !loading && (
+            <p className="text-sm text-slate-500 mt-2">
+              {investors.length === 0
+                ? `No authors found matching "${debouncedSearch}"`
+                : `Found ${investors.length} author${investors.length !== 1 ? 's' : ''} matching "${debouncedSearch}"`}
+            </p>
+          )}
+        </div>
+
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
           <div className="flex items-center justify-between">
@@ -236,7 +319,7 @@ export default function VICLeaderboard() {
                 {['1yr', '3yr', '5yr'].map((period) => (
                   <button
                     key={period}
-                    onClick={() => setTimeFilter(period)}
+                    onClick={() => { setTimeFilter(period); setExpandedRow(null); }}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                       timeFilter === period
                         ? 'bg-white text-blue-600 shadow-sm'
@@ -286,7 +369,7 @@ export default function VICLeaderboard() {
                       onClick={() => setExpandedRow(expandedRow === investor.username ? null : investor.username)}
                     >
                       <td className="px-4 py-4">
-                        <RankBadge rank={index + 1} />
+                        <RankBadge rank={investor.rank} isSearchResult={isSearching} />
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
@@ -340,6 +423,21 @@ export default function VICLeaderboard() {
                 ))}
               </tbody>
             </table>
+          )}
+
+          {/* Pagination - hide when searching */}
+          {!loading && !error && investors.length > 0 && !isSearching && (
+            <div className="border-t border-slate-200 bg-slate-50">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                disabled={loading}
+              />
+              <div className="text-center text-sm text-slate-500 pb-4">
+                Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalCount)} of {totalCount} authors
+              </div>
+            </div>
           )}
         </div>
 

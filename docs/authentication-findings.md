@@ -383,5 +383,98 @@ remember_web_* token → Creates session → Unauthenticated (guest) session
 
 ---
 
-**Status:** ✅ Research complete
-**Next:** Run import script and populate leaderboard
+## Implementation Progress (December 24, 2025)
+
+### Completed Steps
+
+1. **✅ Data Import Complete**
+   - Imported 13,656 ideas into Firestore `ideas` collection
+   - Imported 1,383 unique authors into Firestore `authors` collection
+   - Parsed 8,467 unique company tickers
+
+2. **✅ Daily Scraper Paused**
+   - `daily-scrape` Cloud Scheduler job paused (no longer needed)
+   - `daily-update` job still enabled for price/metrics updates
+   - Command: `gcloud scheduler jobs pause daily-scrape --location=us-central1`
+
+3. **✅ Historical Price Fetching Script Created**
+   - New script: `functions/scripts/fetch-historical-prices.js`
+   - Run with: `npm run fetch:prices`
+   - Respects Yahoo Finance API rate limits (max 10 ideas/day)
+   - Processes authors alphabetically
+   - Tracks progress via `priceAtRec` field on each idea
+
+### Challenges Discovered
+
+#### Yahoo Finance API Limitations
+
+| Issue | Example | Result |
+|-------|---------|--------|
+| Foreign tickers | `TSE:9684` (Tokyo) | No data available |
+| Delisted companies | `NSR` (Neustar - acquired) | No data available |
+| Very old data | Pre-2000 tickers | May not exist |
+| Ticker changes | Company renamed/merged | Need manual mapping |
+
+**Impact:** Some ideas will have `priceAtRec: -1` (failed to fetch). This is expected and acceptable.
+
+#### XIRR Calculation Window
+
+The XIRR metrics are calculated for rolling time windows:
+- `xirr1yr` = Ideas from last 1 year only
+- `xirr3yr` = Ideas from last 3 years only
+- `xirr5yr` = Ideas from last 5 years only
+
+**Example problem:**
+- Author `1ofthe100` has XRX idea from September 2016
+- That's 8+ years ago
+- Falls OUTSIDE the 5-year window
+- Result: `xirr5yr = null` even though we have valid price data
+
+### GitHub Projects Context
+
+Neither of the referenced GitHub projects built a user-facing web application:
+
+| Project | What They Built | End Product |
+|---------|-----------------|-------------|
+| dschonholtz | Scraper + PostgreSQL dump | Raw data for research |
+| sirindudler | Watchlist tracker | CLI tool for personal use |
+
+**Our project is unique** - building an actual leaderboard web app from VIC data.
+
+---
+
+## Open Issues to Think Through
+
+### 1. Ideas Outside XIRR Window
+
+**Problem:** Many imported ideas are from 2010-2019, outside the 5-year XIRR window.
+
+**Questions to consider:**
+- Should we show "all-time" XIRR in addition to 1yr/3yr/5yr?
+- Should older ideas contribute to an author's ranking at all?
+- Is a 10-year window more appropriate for value investing?
+- Should we weight recent picks more heavily?
+
+### 2. Price Data Population Speed
+
+**Current approach:** 10 ideas/day = ~1,365 days to complete all ideas
+
+**Alternatives to consider:**
+- Increase daily limit (risk: Yahoo API rate limiting)
+- Batch by ticker (same ticker fetched once, applied to multiple ideas)
+- Prioritize recent ideas (2020+) first
+- Skip ideas older than 10 years entirely
+
+### 3. Failed Price Fetches
+
+**Current:** ~15-20% of tickers fail (delisted, foreign, renamed)
+
+**Questions:**
+- Should authors with many failed fetches be excluded from rankings?
+- Should we show "X of Y picks have price data" on the UI?
+- Do we need a manual ticker mapping table for common renames?
+
+---
+
+**Status:** ✅ Import complete, price fetching in progress
+**Next:** Decide on XIRR window strategy and price population approach

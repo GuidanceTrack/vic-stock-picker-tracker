@@ -4,6 +4,17 @@ This directory contains research findings and implementation plans for the VIC L
 
 ## Active Documents
 
+### [codebase-review.md](./codebase-review.md)
+**Status:** ✅ Current (Dec 24, 2025)
+
+Complete architecture overview of the VIC Leaderboard project. **Start here if you're new to the codebase.**
+
+**Covers:**
+- Technology stack and directory structure
+- Database schema and data flow
+- Core components and their responsibilities
+- Development setup and deployment
+
 ### [authentication-findings.md](./authentication-findings.md)
 **Status:** ✅ Current (Dec 24, 2025)
 
@@ -36,9 +47,9 @@ Original plan to implement stealth plugins to bypass Cloudflare.
 
 If you're new to this project:
 
-1. Read [authentication-findings.md](./authentication-findings.md) - Explains the research and current approach
-2. Run the import script to populate the database
-3. Skip the stealth plugin plan (no longer needed)
+1. Read [codebase-review.md](./codebase-review.md) - Architecture overview and development setup
+2. Read [authentication-findings.md](./authentication-findings.md) - Research on VIC scraping approach
+3. Run the import script to populate the database
 
 ---
 
@@ -47,6 +58,7 @@ If you're new to this project:
 ```
 docs/
 ├── README.md                              ← You are here
-├── authentication-findings.md             ← START HERE
+├── codebase-review.md                     ← START HERE (architecture overview)
+├── authentication-findings.md             ← Research findings
 └── stealth-plugin-implementation-plan.md  (superseded)
 ```

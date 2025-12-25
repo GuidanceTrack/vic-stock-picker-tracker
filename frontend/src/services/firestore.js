@@ -6,7 +6,9 @@ import {
     getDocs,
     doc,
     getDoc,
-    where
+    where,
+    startAfter,
+    getCountFromServer
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -27,6 +29,32 @@ export async function getLeaderboard(sortBy = 'xirr5yr', limitCount = 50) {
     return snapshot.docs.map((doc, index) => ({
         id: doc.id,
         rank: index + 1,
+        ...doc.data()
+    }));
+}
+
+/**
+ * Search authors by username prefix (case-insensitive)
+ * @param {string} searchTerm - Search term to match against usernameLower
+ * @param {number} limitCount - Max number of results
+ */
+export async function searchAuthors(searchTerm, limitCount = 20) {
+    if (!searchTerm || searchTerm.trim() === '') {
+        return [];
+    }
+
+    const metricsRef = collection(db, 'authorMetrics');
+    const searchLower = searchTerm.toLowerCase().trim();
+    const q = query(
+        metricsRef,
+        where('usernameLower', '>=', searchLower),
+        where('usernameLower', '<=', searchLower + '\uf8ff'),
+        limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
         ...doc.data()
     }));
 }
@@ -106,4 +134,54 @@ export async function getAuthorWithIdeas(username) {
 export async function getAggregateStats() {
     const statsDoc = await getDoc(doc(db, 'stats', 'aggregate'));
     return statsDoc.exists() ? statsDoc.data() : null;
+}
+
+/**
+ * Get paginated leaderboard data
+ * @param {string} sortBy - Field to sort by
+ * @param {number} pageSize - Number of records per page
+ * @param {DocumentSnapshot|null} startAfterDoc - Cursor for pagination
+ */
+export async function getPaginatedLeaderboard(sortBy, pageSize, startAfterDoc = null) {
+    const metricsRef = collection(db, 'authorMetrics');
+
+    let q;
+    if (startAfterDoc) {
+        q = query(
+            metricsRef,
+            orderBy(sortBy, 'desc'),
+            startAfter(startAfterDoc),
+            limit(pageSize)
+        );
+    } else {
+        q = query(
+            metricsRef,
+            orderBy(sortBy, 'desc'),
+            limit(pageSize)
+        );
+    }
+
+    const snapshot = await getDocs(q);
+    return {
+        docs: snapshot.docs,
+        data: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        lastDoc: snapshot.docs[snapshot.docs.length - 1] || null,
+        hasMore: snapshot.docs.length === pageSize
+    };
+}
+
+/**
+ * Get total count of authors
+ */
+export async function getAuthorCount() {
+    // Try stats document first (O(1) read)
+    const statsDoc = await getDoc(doc(db, 'stats', 'aggregate'));
+    if (statsDoc.exists() && statsDoc.data().totalAuthors !== undefined) {
+        return statsDoc.data().totalAuthors;
+    }
+
+    // Fallback: count query
+    const metricsRef = collection(db, 'authorMetrics');
+    const countSnapshot = await getCountFromServer(query(metricsRef));
+    return countSnapshot.data().count;
 }

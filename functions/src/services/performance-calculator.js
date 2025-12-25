@@ -94,6 +94,7 @@ export async function calculateAuthorMetrics(username) {
     if (validIdeas.length === 0) {
         return {
             username,
+            usernameLower: username.toLowerCase(),
             totalPicks: ideas.length,
             validPicks: 0,
             xirr1yr: null,
@@ -187,6 +188,7 @@ export async function calculateAuthorMetrics(username) {
 
     return {
         username,
+        usernameLower: username.toLowerCase(),
         totalPicks: ideas.length,
         validPicks: validIdeas.length,
         xirr1yr,

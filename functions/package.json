@@ -13,6 +13,8 @@
     "seed": "node scripts/seed-authors.js",
     "seed:ideas": "node scripts/seed-sample-ideas.js",
     "import:vic-data": "node scripts/import/import-vic-data.js",
+    "fetch:prices": "node scripts/fetch-historical-prices.js",
+    "mark:inactive": "node scripts/mark-inactive-authors.js",
     "save-session": "node src/scraper/save-session.js",
     "check-session": "node src/scripts/check-session-health.js",
     "test:refresh": "node src/scripts/test-auto-refresh.js",
