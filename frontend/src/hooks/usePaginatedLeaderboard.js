@@ -9,10 +9,13 @@ const PAGE_SIZE = 25;
  */
 export function usePaginatedLeaderboard(sortBy = 'xirr5yr') {
     const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(sortBy !== null);
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+
+    // If sortBy is null, hook is disabled - return empty state
+    const isDisabled = sortBy === null;
 
     // Cache: pageNumber -> last document of that page (cursor for next page)
     const cursorCache = useRef(new Map());
@@ -33,6 +36,8 @@ export function usePaginatedLeaderboard(sortBy = 'xirr5yr') {
 
     // Fetch total count on mount
     useEffect(() => {
+        if (isDisabled) return;
+
         const fetchCount = async () => {
             try {
                 const count = await getAuthorCount();
@@ -42,7 +47,7 @@ export function usePaginatedLeaderboard(sortBy = 'xirr5yr') {
             }
         };
         fetchCount();
-    }, []);
+    }, [isDisabled]);
 
     // Fetch page data
     const fetchPage = useCallback(async (pageNum) => {
@@ -103,8 +108,9 @@ export function usePaginatedLeaderboard(sortBy = 'xirr5yr') {
 
     // Fetch first page on mount and when sort changes
     useEffect(() => {
+        if (isDisabled) return;
         fetchPage(1);
-    }, [sortBy, fetchPage]);
+    }, [sortBy, fetchPage, isDisabled]);
 
     // Navigation functions
     const goToPage = useCallback((pageNum) => {

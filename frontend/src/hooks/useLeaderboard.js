@@ -15,6 +15,13 @@ export function useLeaderboard(sortBy = 'xirr5yr', limitCount = 50, searchTerm =
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        // Skip if sortBy is null (disabled hook)
+        if (sortBy === null) {
+            setData([]);
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         setError(null);
 

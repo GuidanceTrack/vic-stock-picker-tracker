@@ -476,5 +476,607 @@ Neither of the referenced GitHub projects built a user-facing web application:
 
 ---
 
-**Status:** ✅ Import complete, price fetching in progress
-**Next:** Decide on XIRR window strategy and price population approach
+## Implementation Progress (December 25, 2025)
+
+### Decisions Made
+
+#### 1. Focus on 5-Year Window Only
+
+**Decision:** Only fetch prices for ideas from the past 5 years.
+
+**Rationale:**
+- UI only displays 1yr/3yr/5yr XIRR metrics
+- Older ideas would never appear in rankings anyway
+- Significantly reduces the number of ideas to process
+- Aligns data collection with UI capabilities
+
+#### 2. Pre-Mark Inactive Authors
+
+**Decision:** Create a script to pre-identify and mark authors with no recent ideas.
+
+**Rationale:**
+- Avoid querying ideas for 786 authors who have no relevant data
+- Speed up the price fetching process
+- One-time operation that pays dividends on every subsequent run
+
+### Scripts Created
+
+#### `functions/scripts/mark-inactive-authors.js`
+
+**Purpose:** Pre-process all authors and mark those with no ideas in the past 5 years.
+
+**Run with:**
+```bash
+cd functions
+npm run mark:inactive
+```
+
+**What it does:**
+1. Iterates through all unprocessed authors
+2. Checks if they have any ideas within the 5-year window
+3. Marks authors with no recent ideas as complete (`pricesFetchedAt` + `noRecentIdeas: true`)
+4. Leaves authors with recent ideas for price fetching
+
+### Code Changes
+
+#### Modified `fetch-historical-prices.js`
+
+**Functions updated:**
+- `getIdeasNeedingPrices()` - Now filters to only ideas from past 5 years
+- `countRemainingIdeas()` - Same 5-year filter for accurate counting
+
+**Key change:**
+```javascript
+// Calculate 5-year cutoff date
+const fiveYearsAgo = new Date();
+fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+
+// Filter: only ideas within 5 years AND needing prices
+const isWithinFiveYears = postedDate >= fiveYearsAgo;
+```
+
+### Results
+
+#### Author Classification
+
+| Category | Count | Percentage |
+|----------|-------|------------|
+| **Marked inactive** (no ideas in past 5 years) | 786 | 58% |
+| **Has recent ideas** (need price fetching) | 564 | 42% |
+| **Total authors** | 1,350 | 100% |
+
+**Impact:** Reduced workload from 1,350 authors to 564 authors (58% reduction).
+
+#### Price Fetching Progress
+
+Processed ~40 authors with the following results:
+
+| Author | XIRR 5yr | Notes |
+|--------|----------|-------|
+| AlfredJones%21 | **+73.4%** | Top performer |
+| Arturo | **+30.1%** | |
+| AltaRocks | **+19.1%** | |
+| JackBlack | **+8.7%** | |
+| Ares | **+3.9%** | |
+| Akritai | **+2.8%** | |
+| Azalea | **+1.4%** | |
+| Astor | **+1.1%** | |
+| BTudela16 | **-6.7%** | |
+| BCD711 | **-11.6%** | |
+| AIFL | **-17.5%** | |
+| ATM | **-20.2%** | |
+| BJG | **-20.3%** | |
+| Artz0423 | **-30.1%** | |
+| Asymmetrical | **-48.0%** | Worst performer so far |
+
+#### Ticker Success Rate
+
+From the ~40 authors processed:
+- **~50% success rate** on price fetches
+- **~50% delisted** or unavailable tickers
+
+This is expected given the nature of small-cap value investing (companies get acquired, go bankrupt, or delist).
+
+### Updated Workflow
+
+**Daily price fetching:**
+```bash
+cd functions
+npm run fetch:prices    # Processes next author alphabetically
+```
+
+**After fetching prices:**
+```bash
+npm run update:metrics  # Calculates XIRR for all authors with price data
+```
+
+### Remaining Work
+
+| Task | Count | Est. Time |
+|------|-------|-----------|
+| Authors with recent ideas | 564 | ~56 days at 10/day |
+| Ideas to process | ~2,000-3,000 | Varies by author |
+
+### Open Issues Resolved
+
+| Issue | Resolution |
+|-------|------------|
+| Ideas outside XIRR window | ✅ Only fetch prices for 5-year window |
+| Price data population speed | ✅ Reduced scope by 58% via inactive marking |
+| Failed price fetches | Accepted as normal (~50% for small-caps) |
+
+---
+
+**Status:** ✅ Import complete, 5-year filter implemented, ~40 authors with XIRR data
+**Next:** Continue daily price fetching for remaining 564 authors
+
+---
+
+## New Architecture: Local Scraper App (December 28, 2025)
+
+### Overview
+
+A new approach: build a **local web application** that allows users to provide their VIC cookies and automatically scrape/calculate XIRR for authors of newly-visible ideas. This version is designed to be handed off to a friend to run locally.
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **Authentication** | None (cookie input) | User pastes VIC cookies directly |
+| **Database** | SQLite (local) | No cloud dependency, per-user storage |
+| **Scraping** | Python/Selenium | Reuse sirindudler's battle-tested code |
+| **Frontend** | Existing React UI | Reuse VICLeaderboard.jsx |
+| **Backend** | Python Flask | Serves API + runs scraper |
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     USER'S BROWSER                          │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │         React Frontend (existing UI)                 │   │
+│  │  - Cookie input form (new)                          │   │
+│  │  - Leaderboard display (reuse VICLeaderboard.jsx)   │   │
+│  │  - Calls local Flask API instead of Firestore       │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Python Flask Backend                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │  Flask API   │  │  Scraper     │  │  XIRR Calculator │   │
+│  │  /api/*      │  │  (Selenium)  │  │  (pyxirr)        │   │
+│  └──────────────┘  └──────────────┘  └──────────────────┘   │
+│                              │                               │
+│                              ▼                               │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              SQLite Database (local)                  │   │
+│  │  - authors, ideas, prices, scrape_log                │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### User Flow
+
+1. User opens http://localhost:3000 (React app)
+2. Frontend shows cookie input form with instructions:
+   - "Login to VIC in Firefox"
+   - "Install Cookie-Editor extension"
+   - "Export cookies as JSON"
+   - "Paste JSON below"
+   - "Don't use Firefox while scraping"
+3. User pastes cookies and clicks "Start"
+4. Backend scrapes VIC and updates database
+5. Leaderboard displays results
+
+### How VIC Works (Key Insight)
+
+- VIC delays idea visibility by **45 days**
+- Each day, ideas from 45 days ago become visible to members
+- The scraper processes ideas that became visible "today" (the 45-day-old batch)
+
+### Scraper Workflow
+
+```
+1. GET LATEST IDEAS (requires auth)
+   - Navigate to member-only ideas feed
+   - Find ideas from the "45 days ago" date
+   - Extract: idea URL, author username, ticker, company name
+
+2. FOR EACH NEW IDEA:
+   a. SCRAPE IDEA DETAIL PAGE
+      - Get author's stated "price at recommendation" (from page)
+      - Get posting date, ticker, position type (long/short)
+
+   b. CHECK IF AUTHOR ALREADY SCRAPED
+      - If yes, skip to step 2c
+      - If no, scrape author's full history (step 2b-i)
+
+   b-i. SCRAPE AUTHOR PROFILE (sirindudler code)
+      - Search via /search/{username}
+      - Click through to member profile
+      - Parse ideas table (past 5 years)
+      - For each idea: visit page, scrape price
+
+   c. FETCH CURRENT PRICES (Yahoo Finance via yfinance)
+
+   d. CALCULATE XIRR (pyxirr library)
+      - Store results in SQLite
+
+3. DISPLAY RESULTS
+   - Leaderboard shows authors ranked by XIRR
+```
+
+### Code Reuse from sirindudler
+
+From `sirindudler-watchlist/code/VIC_postFinder.py`:
+
+| Feature | Lines | What It Does |
+|---------|-------|--------------|
+| Cookie injection | 32-46 | Add `vic_session` cookie to Selenium |
+| Member search | 75-86 | Navigate `/search/{username}`, click profile |
+| Ideas table parsing | 88-133 | Parse `table.table.itable.box-shadow` |
+| Rate limiting | 48-58 | Smart delays to avoid detection |
+
+### New Backend Structure
+
+```
+backend/
+├── app.py                    # Flask server, API routes
+├── requirements.txt          # Python dependencies
+├── scraper/
+│   ├── base.py              # Selenium setup, cookie handling
+│   ├── latest_ideas.py      # Scrape newly-visible ideas feed
+│   ├── idea_detail.py       # Scrape individual idea page for price
+│   └── author_history.py    # Adapted from sirindudler
+├── services/
+│   ├── yahoo_prices.py      # yfinance wrapper
+│   └── xirr_calculator.py   # pyxirr wrapper
+├── db/
+│   ├── models.py            # SQLAlchemy models
+│   └── database.py          # DB connection, queries
+└── vic_scraper.db           # SQLite database file
+```
+
+### API Endpoints
+
+```
+POST /api/cookies          # Submit VIC cookies, start scraping
+GET  /api/scrape/status    # Check scraping progress
+GET  /api/leaderboard      # Get ranked authors with XIRR
+GET  /api/author/{id}      # Get author details + ideas
+```
+
+### Frontend Modifications
+
+| File | Changes |
+|------|---------|
+| `src/App.jsx` | Add cookie input page as first step |
+| `src/services/api.js` | **New** - Replace Firestore with Flask API calls |
+| `src/hooks/useLeaderboard.js` | Change to use local API |
+| `src/components/CookieInput.jsx` | **New** - Cookie paste form |
+
+### Running Locally
+
+```bash
+# Terminal 1: Backend
+cd backend
+pip install -r requirements.txt
+python app.py   # Runs on http://localhost:5000
+
+# Terminal 2: Frontend
+cd frontend
+npm install
+npm run dev     # Runs on http://localhost:3000
+```
+
+### Python Dependencies
+
+```
+flask>=3.0.0
+flask-cors>=4.0.0
+selenium>=4.15.0
+webdriver-manager>=4.0.0
+yfinance>=0.2.30
+pyxirr>=0.9.0
+sqlalchemy>=2.0.0
+```
+
+### Implementation Phases
+
+1. **Phase 1: Backend Foundation** - Flask + SQLite + API endpoints
+2. **Phase 2: Scraper Core** - Port sirindudler code, add idea detail scraper
+3. **Phase 3: Prices & XIRR** - yfinance integration, pyxirr calculation
+4. **Phase 4: Frontend Integration** - Cookie input, replace Firestore calls
+5. **Phase 5: Polish** - Progress indicator, error handling, documentation
+
+---
+
+## Implementation Complete (December 28, 2025)
+
+All phases have been implemented. The local scraper architecture is ready for use.
+
+### Files Created
+
+**Backend (`backend/`)**
+
+| File | Description |
+|------|-------------|
+| `app.py` | Flask API server with all endpoints |
+| `requirements.txt` | Python dependencies |
+| `db/models.py` | SQLAlchemy models (Author, Idea, Price, AuthorMetrics, ScrapeLog, CookieStore) |
+| `db/database.py` | Database operations and query functions |
+| `db/__init__.py` | Package exports |
+| `scraper/base.py` | Selenium setup with Cookie-Editor JSON format support |
+| `scraper/latest_ideas.py` | Scrapes the VIC ideas feed |
+| `scraper/idea_detail.py` | Scrapes individual idea pages for price at recommendation |
+| `scraper/author_history.py` | Author profile scraping (adapted from sirindudler) |
+| `scraper/__init__.py` | Package exports |
+| `services/yahoo_prices.py` | yfinance wrapper for price fetching |
+| `services/xirr_calculator.py` | pyxirr wrapper for XIRR calculations |
+| `services/__init__.py` | Package exports |
+| `README.md` | Setup and usage instructions |
+
+**Frontend (`frontend/src/`)**
+
+| File | Description |
+|------|-------------|
+| `App.jsx` | Updated with cookie input → scraping → leaderboard flow |
+| `services/api.js` | Flask API client (replaces Firestore for local mode) |
+| `components/CookieInput.jsx` | Cookie paste form with instructions |
+| `components/ScrapeProgress.jsx` | Real-time scraping progress indicator |
+| `hooks/useLocalLeaderboard.js` | Leaderboard hook for Flask API |
+| `hooks/useLocalAuthor.js` | Author details hook for Flask API |
+| `hooks/useScrapeStatus.js` | Scrape status polling hook |
+| `components/VICLeaderboard.jsx` | Updated to support both Firestore and local API modes via `useLocalApi` prop |
+
+### How to Run
+
+**Terminal 1 - Backend:**
+```bash
+cd backend
+pip install -r requirements.txt
+python app.py   # Runs on http://localhost:5000
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev     # Runs on http://localhost:5173
+```
+
+### Cookie Format Supported
+
+The system accepts Cookie-Editor JSON export format:
+```json
+[
+    {
+        "name": "vic_session",
+        "value": "eyJpdiI6...",
+        "domain": ".valueinvestorsclub.com",
+        "path": "/",
+        "secure": false,
+        "httpOnly": true,
+        "expirationDate": 1766908265.036
+    }
+]
+```
+
+### User Flow
+
+1. User opens `http://localhost:5173`
+2. Sees cookie input form with instructions
+3. Exports cookies from Cookie-Editor in Firefox/Chrome
+4. Pastes JSON and clicks "Submit"
+5. Backend validates cookies and starts scraping
+6. Progress page shows real-time updates
+7. When complete, leaderboard displays with XIRR rankings
+
+---
+
+## LatestIdeasScraper Fix (December 28, 2025)
+
+### Problem Discovered
+
+When testing the local scraper app, the scrape completed but found **0 ideas**. Investigation revealed the `LatestIdeasScraper` was looking for `table.table` CSS selector on the `/ideas` page, but VIC's page structure had changed.
+
+### VIC Page Structure (Current)
+
+The `/ideas` page now uses a **card-based layout**, not a traditional table:
+
+```html
+<!-- Entry header with company name, ticker, price, market cap -->
+<p class="entry-header">
+    <a href="/idea/Allient_Inc./7736231948">Allient Inc.</a> ALNT • 54.00 • $910mn
+</p>
+
+<!-- Author info with username in span title attribute -->
+<p class="submitted-by">
+    BY <span title="S. N. Harper">S. N. Harper</span> • <span>Short Idea</span>
+</p>
+```
+
+### Fix Applied
+
+Updated `backend/scraper/latest_ideas.py` to:
+
+1. Wait for `p.submitted-by` elements to load
+2. Find all `p.entry-header` elements (company + ticker info)
+3. Find all `p.submitted-by` elements (author info)
+4. Match them by index (they appear in same order)
+5. Extract author from `<span title="username">` attribute
+6. Extract ticker using regex from header text
+7. Detect "Short Idea" for position type
+
+### Test Results
+
+After fix:
+```
+Found 10 entry headers, 10 submitted-by elements
+Idea: Allient Inc. (ALNT) by S. N. Harper [short]
+Idea: Keystone Law Group plc (KEYS LN) by Snowball300830 [long]
+Idea: SPORTRADAR GROUP AG (SRAD) by Jumbos02 [long]
+Idea: ArcBest (ARCB) by leob710 [long]
+...
+
+Total ideas found: 10
+Unique authors: ['leob710', 'CT3 1HP', 'S. N. Harper', 'zamperini', ...]
+```
+
+**Note:** The 10 ideas came from **multiple days** displayed on page 1, not just one day:
+- Wednesday, Nov 12, 2025: 2 ideas (S. N. Harper, Snowball300830)
+- Tuesday, Nov 11, 2025: more ideas
+- Monday, Nov 10, 2025: more ideas
+- etc.
+
+The scraper currently grabs all ideas visible on the page regardless of date. If you only want **today's newly-visible ideas** (those that just passed the 45-day delay), the scraper would need to filter by the specific date header.
+
+### Full Scrape Flow
+
+The complete flow when user triggers a scrape:
+
+1. **Step 1: LatestIdeasScraper** → Gets ideas from `/ideas` page, extracts author names ✅ (now fixed)
+2. **Step 2: Save Ideas** → Stores ideas in SQLite database
+3. **Step 3: AuthorHistoryScraper** → For each new author, goes to their profile page (`/member/{username}/{id}`), scrapes all their ideas from past 5 years
+4. **Step 4: Price Fetching** → Gets prices from Yahoo Finance (yfinance)
+5. **Step 5: Metrics Calculation** → Calculates XIRR for 1yr, 3yr, 5yr windows
+
+### Still To Test
+
+**The full end-to-end flow needs to be tested with a user:**
+
+- [ ] Cookie input and validation
+- [ ] LatestIdeasScraper finding ideas (now fixed)
+- [ ] AuthorHistoryScraper scraping author profiles
+- [ ] Price fetching from Yahoo Finance
+- [ ] XIRR calculation and display in leaderboard
+- [ ] Error handling and progress updates
+
+The sirindudler-based `AuthorHistoryScraper` uses the same table selector (`table.table.itable.box-shadow`) that worked in the original project, so it should still work - but this needs real-world verification.
+
+---
+
+## Date Filtering Bug Fix (December 28, 2025)
+
+### Problem Discovered
+
+During testing, the scraper grabbed 10 ideas instead of just the ideas from the latest day. Investigation revealed:
+
+1. User observed only 1 idea posted on Nov 13, 2025 when visiting VIC directly
+2. Scraper grabbed 10 ideas and labeled them all as Nov 12, 2025
+3. Date filtering was not working - all ideas on the page were being scraped
+
+### Root Cause Analysis
+
+**The CSS selector was wrong.** The scraper was looking for:
+
+```python
+# WRONG - looking for h2, h3, or .date-header
+date_headers = self.driver.find_elements(By.CSS_SELECTOR,
+    "h2.date-header, h3.date-header, .date-header, h2, h3")
+```
+
+But the actual VIC `/ideas` page uses `<p class="header">` for date headers:
+
+```html
+<div id="ideas_body">
+    <div class="row">
+        <div class="col-lg-12">
+            <p class="header">Wednesday, Nov 12, 2025</p>
+        </div>
+    </div>
+    <!-- ideas for Nov 12 -->
+    <div class="row">
+        <div class="col-lg-12">
+            <p class="header">Tuesday, Nov 11, 2025</p>
+        </div>
+    </div>
+    <!-- ideas for Nov 11 -->
+</div>
+```
+
+The `.date-header` class exists but only in the **messages panel** on the right side, not in the ideas list.
+
+### Fix Applied
+
+Changed the CSS selector in `backend/scraper/latest_ideas.py`:
+
+```python
+# CORRECT - specifically target date headers in the ideas body
+date_headers = self.driver.find_elements(By.CSS_SELECTOR, "#ideas_body p.header")
+```
+
+### Testing Required
+
+The fix has been applied but needs verification:
+
+1. Delete the existing SQLite database: `del backend/vic_scraper.db`
+2. Restart the Flask server
+3. Submit cookies through the frontend
+4. Verify that only ideas from the latest day are scraped (should be 1-3 ideas typically, not 10)
+5. Check that the correct date is assigned to each idea
+
+---
+
+## End-to-End Test Successful (December 28, 2025)
+
+### Test Scenario
+
+Deleted author "yellow" from the database and ran a fresh scrape to verify the full flow works.
+
+### Test Steps Performed
+
+1. **Deleted yellow from SQLite database** - Removed from `authors`, `ideas`, and `author_metrics` tables
+2. **Started both servers:**
+   - Backend: `python app.py` → http://localhost:5000
+   - Frontend: `npm run dev` → http://localhost:5176
+3. **Clicked "Scrape New Ideas" button** on the leaderboard
+4. **Observed scraping progress:**
+   - Step 1: Scraping Latest Ideas → Found yellow's CLLNY idea (Nov 13, 2025)
+   - Step 2: Scraping Author Histories → Processing yellow
+   - Step 3: Fetching Prices → Yahoo Finance queries (some 404s for international tickers)
+   - Step 4: Calculating Metrics → XIRR computed
+5. **Scrape completed** → Redirected to leaderboard
+
+### Results
+
+| Author | Rank | 5YR XIRR | 3YR XIRR | 1YR XIRR | Picks | Best Pick |
+|--------|------|----------|----------|----------|-------|-----------|
+| **yellow** | #1 | **+87.1%** | **+87.1%** | **+87.1%** | 3 | EQX +119% |
+
+Yellow was correctly:
+- Detected as a new author (not in DB)
+- Added to `authors` table
+- Had their full history scraped (3 ideas: CLLNY, EQX, CNM)
+- Prices fetched from Yahoo Finance
+- XIRR calculated and stored in `author_metrics`
+- Ranked #1 on the leaderboard
+
+### UI Enhancements Added
+
+Added "Scrape New Ideas" button to the leaderboard header:
+- Only visible in local API mode (`useLocalApi={true}`)
+- Calls `/api/scrape/start` endpoint
+- Switches to progress view during scrape
+- Returns to leaderboard when complete
+
+**Files modified:**
+- `frontend/src/components/VICLeaderboard.jsx` - Added button and `onStartScrape` prop
+- `frontend/src/App.jsx` - Added `handleStartScrape` function
+
+### Open Question (Parked)
+
+> Can we assume that we would always have to manually hit the scrape button?
+
+Options to consider for future:
+1. **Manual only** - User clicks "Scrape New Ideas" when they want fresh data
+2. **Scheduled scrape** - Backend runs scrape on a schedule (daily/weekly)
+3. **Auto-scrape on startup** - Scrape automatically when app starts if data is stale
+
+Currently: Manual scrape via button click.
+
+---
+
+**Status:** Full scraping flow verified working. Ready for user testing.

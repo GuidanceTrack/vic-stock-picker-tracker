@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ExternalLink, Target, Clock, BarChart3, Info, Loader2, AlertCircle, Search, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ExternalLink, Target, Clock, BarChart3, Info, Loader2, AlertCircle, Search, X, RefreshCw } from 'lucide-react';
 import { usePaginatedLeaderboard } from '../hooks/usePaginatedLeaderboard';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useAuthor } from '../hooks/useAuthor';
+import { useLocalLeaderboard } from '../hooks/useLocalLeaderboard';
+import { useLocalAuthor } from '../hooks/useLocalAuthor';
 import Pagination from './Pagination';
 
 // Custom hook for debouncing
@@ -98,8 +100,12 @@ const EmptyState = () => (
   </div>
 );
 
-const ExpandedRow = ({ username }) => {
-  const { data: author, loading, error } = useAuthor(username);
+const ExpandedRow = ({ username, useLocalApi = false }) => {
+  // Use local API or Firestore based on prop
+  const localAuthor = useLocalAuthor(useLocalApi ? username : null);
+  const firestoreAuthor = useAuthor(useLocalApi ? null : username);
+
+  const { data: author, loading, error } = useLocalApi ? localAuthor : firestoreAuthor;
 
   if (loading) {
     return (
@@ -197,7 +203,7 @@ function formatDate(date) {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-export default function VICLeaderboard() {
+export default function VICLeaderboard({ useLocalApi = false, onStartScrape = null }) {
   const [expandedRow, setExpandedRow] = useState(null);
   const [timeFilter, setTimeFilter] = useState('5yr');
   const [showMethodology, setShowMethodology] = useState(false);
@@ -207,32 +213,59 @@ export default function VICLeaderboard() {
   const debouncedSearch = useDebounce(searchInput, 300);
   const isSearching = debouncedSearch.trim() !== '';
 
-  // Map filter to Firestore field name
+  // Map filter to field name
   const sortField = `xirr${timeFilter}`;
 
-  // Paginated data for normal view
-  const {
-    data: paginatedInvestors,
-    loading: paginatedLoading,
-    error: paginatedError,
-    currentPage,
-    totalPages,
-    totalCount,
-    pageSize,
-    goToPage
-  } = usePaginatedLeaderboard(sortField);
+  // Use local API hooks
+  const localLeaderboard = useLocalLeaderboard(
+    useLocalApi ? sortField : null,
+    25,
+    useLocalApi ? debouncedSearch : ''
+  );
 
-  // Search results
-  const {
-    data: searchResults,
-    loading: searchLoading,
-    error: searchError
-  } = useLeaderboard(sortField, 50, debouncedSearch);
+  // Use Firestore hooks (paginated + search)
+  const firestorePaginated = usePaginatedLeaderboard(useLocalApi ? null : sortField);
+  const firestoreSearch = useLeaderboard(
+    useLocalApi ? null : sortField,
+    50,
+    useLocalApi ? '' : debouncedSearch
+  );
 
-  // Use search results when searching, otherwise paginated results
-  const investors = isSearching ? searchResults : paginatedInvestors;
-  const loading = isSearching ? searchLoading : paginatedLoading;
-  const error = isSearching ? searchError : paginatedError;
+  // Select the appropriate data based on mode
+  let investors, loading, error, currentPage, totalPages, totalCount, pageSize, goToPage;
+
+  if (useLocalApi) {
+    // Local API mode - single hook handles both pagination and search
+    investors = localLeaderboard.data;
+    loading = localLeaderboard.loading;
+    error = localLeaderboard.error;
+    currentPage = localLeaderboard.currentPage;
+    totalPages = localLeaderboard.totalPages;
+    totalCount = localLeaderboard.totalCount;
+    pageSize = localLeaderboard.pageSize;
+    goToPage = localLeaderboard.goToPage;
+  } else {
+    // Firestore mode - separate hooks for pagination and search
+    if (isSearching) {
+      investors = firestoreSearch.data;
+      loading = firestoreSearch.loading;
+      error = firestoreSearch.error;
+      currentPage = 1;
+      totalPages = 1;
+      totalCount = firestoreSearch.data.length;
+      pageSize = 50;
+      goToPage = () => {};
+    } else {
+      investors = firestorePaginated.data;
+      loading = firestorePaginated.loading;
+      error = firestorePaginated.error;
+      currentPage = firestorePaginated.currentPage;
+      totalPages = firestorePaginated.totalPages;
+      totalCount = firestorePaginated.totalCount;
+      pageSize = firestorePaginated.pageSize;
+      goToPage = firestorePaginated.goToPage;
+    }
+  }
 
   // Handle page change - close expanded row
   const handlePageChange = (page) => {
@@ -262,6 +295,15 @@ export default function VICLeaderboard() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {useLocalApi && onStartScrape && (
+                <button
+                  onClick={onStartScrape}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                >
+                  <RefreshCw size={14} />
+                  Scrape New Ideas
+                </button>
+              )}
               <button
                 onClick={() => setShowMethodology(true)}
                 className="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1"
@@ -417,7 +459,7 @@ export default function VICLeaderboard() {
 
                     {/* Expanded Row */}
                     {expandedRow === investor.username && (
-                      <ExpandedRow username={investor.username} />
+                      <ExpandedRow username={investor.username} useLocalApi={useLocalApi} />
                     )}
                   </React.Fragment>
                 ))}
