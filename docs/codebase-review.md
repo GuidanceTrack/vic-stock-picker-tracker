@@ -1,6 +1,6 @@
 # VIC Leaderboard - Codebase Architecture Review
 
-*Last updated: December 28, 2025*
+*Last updated: December 29, 2025*
 
 This document provides a comprehensive overview of the VIC Leaderboard codebase architecture for onboarding new contributors.
 
@@ -61,7 +61,8 @@ Vic-Leaderboard/
 │   │   ├── components/
 │   │   │   ├── VICLeaderboard.jsx  # Main leaderboard UI (supports both modes)
 │   │   │   ├── Pagination.jsx      # Pagination controls
-│   │   │   ├── CookieInput.jsx     # Cookie paste form (local mode)
+│   │   │   ├── CookieInput.jsx     # Cookie paste form (local mode, full page)
+│   │   │   ├── CookieModal.jsx     # Cookie re-entry modal (local mode, overlay)
 │   │   │   └── ScrapeProgress.jsx  # Scraping progress (local mode)
 │   │   ├── hooks/
 │   │   │   ├── useLeaderboard.js   # Firestore leaderboard data
@@ -338,10 +339,18 @@ is_valid: Boolean
 
 | File | Purpose | Mode |
 |------|---------|------|
-| `VICLeaderboard.jsx` | Main leaderboard with expandable rows, search, pagination | Both |
+| `App.jsx` | Root component, mode switching (loading/cookie/scraping/leaderboard) | Both |
+| `VICLeaderboard.jsx` | Main leaderboard with expandable rows, search, pagination, "Scrape New Ideas" button, cookie verification | Both |
 | `Pagination.jsx` | Page navigation controls | Both |
-| `CookieInput.jsx` | Cookie paste form with instructions | Local |
+| `CookieInput.jsx` | Full-page cookie paste form with instructions (shown when no data exists) | Local |
+| `CookieModal.jsx` | Cookie re-entry modal overlay (shown when clicking "Scrape" with expired/missing cookies) | Local |
 | `ScrapeProgress.jsx` | Real-time scraping progress | Local |
+
+### Key Props
+
+**VICLeaderboard.jsx:**
+- `useLocalApi` (boolean) - Use Flask API instead of Firestore
+- `onStartScrape` (function) - Callback to trigger new scrape (shows "Scrape New Ideas" button when provided)
 
 ### Hooks
 
@@ -361,8 +370,9 @@ is_valid: Boolean
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/health` | GET | Health check with stats |
-| `/api/cookies` | POST | Submit VIC cookies, start scraping |
-| `/api/cookies` | GET | Check if valid cookies stored |
+| `/api/cookies` | POST | Submit VIC cookies, optionally start scraping |
+| `/api/cookies` | GET | Check if cookies are stored (doesn't verify validity) |
+| `/api/cookies/verify` | POST | Verify stored cookies by testing VIC authentication |
 | `/api/scrape/start` | POST | Start scraping process |
 | `/api/scrape/status` | GET | Get scraping progress |
 | `/api/leaderboard` | GET | Paginated leaderboard (`sort`, `limit`, `offset`) |
@@ -420,6 +430,57 @@ firebase deploy --only functions
 
 ---
 
+## VIC Authentication Notes
+
+**Important:** VIC uses Laravel authentication with `remember_web_*` tokens. These tokens do NOT auto-authenticate sessions:
+
+- `vic_session` cookies expire after 3-12 hours
+- The `remember_web_*` token (399-day expiry) creates a NEW `vic_session` when you navigate, but it's an **unauthenticated guest session**
+- **Manual cookie refresh is required** for member page access
+- Cloudflare does NOT actively block Playwright/Selenium on VIC
+
+**Cookie refresh workflow:**
+1. Login to VIC manually in Firefox/Chrome
+2. Export cookies using Cookie-Editor extension (JSON format)
+3. Paste into the local app's cookie input form
+4. Cookies typically last 3-12 hours before needing refresh
+
+---
+
+## Cloud Scheduler Commands (Reference)
+
+```bash
+# Set Python path for gcloud (Windows)
+set CLOUDSDK_PYTHON="C:\Program Files\Python312\python.exe"
+
+# List all scheduler jobs
+gcloud scheduler jobs list --location=us-central1
+
+# Manually trigger daily update (prices + metrics)
+gcloud scheduler jobs run daily-update --location=us-central1
+
+# Pause/resume a job
+gcloud scheduler jobs pause daily-scrape --location=us-central1
+gcloud scheduler jobs resume daily-scrape --location=us-central1
+
+# View logs: https://console.cloud.google.com/functions/list?project=vic-leaderboard
+```
+
+---
+
+## Historical Data Import (Optional)
+
+If you need historical VIC data without scraping, there's an existing dataset:
+
+- **Source:** [dschonholtz/ValueInvestorsClub](https://github.com/dschonholtz/ValueInvestorsClub)
+- **Data:** 13,656 ideas with usernames, tickers, dates, position types
+- **Import script:** `functions/scripts/import/import-vic-data.js`
+- **Run:** `npm run import:vic-data` (in `functions/` directory)
+
+This provides a baseline dataset for the leaderboard without any authentication required.
+
+---
+
 ## Current Status
 
 ### Completed
@@ -436,6 +497,11 @@ firebase deploy --only functions
 - [x] Data import scripts for VIC dataset
 - [x] Historical price fetching utilities
 - [x] Session health monitoring scripts
+- [x] **"Scrape New Ideas" button** - Manual trigger for new scrapes from leaderboard UI
+- [x] **End-to-end scraping flow verified** - Full cycle tested and working (Dec 28, 2025)
+- [x] **Cookie verification before scraping** - Verifies VIC authentication before starting scrape (Dec 29, 2025)
+- [x] **Cookie re-entry modal** - Shows overlay to re-enter cookies when expired/missing (Dec 29, 2025)
+- [x] **Smart app initialization** - Shows leaderboard if data exists, regardless of cookie status (Dec 29, 2025)
 
 ### In Progress
 - [ ] Production data population
@@ -443,10 +509,80 @@ firebase deploy --only functions
 
 ---
 
+## Local Mode User Flow
+
+1. **Start servers:**
+   - Backend: `python backend/app.py` → http://localhost:5000
+   - Frontend: `npm run dev --prefix frontend` → http://localhost:5173
+
+2. **App initialization logic:**
+   - If scrape is running → show scraping progress
+   - If data exists (authors with metrics) → show leaderboard
+   - If no data AND no cookies → show full-page cookie input
+   - If no data AND expired cookies → show full-page cookie input
+   - If no data AND valid cookies → show leaderboard
+
+3. **First-time setup:**
+   - App shows cookie input form (since no data exists)
+   - User exports cookies from Cookie-Editor browser extension
+   - Pastes JSON and submits
+   - Scraping starts automatically
+
+4. **Scraping with existing data:**
+   - Click "Scrape New Ideas" button on leaderboard
+   - Button shows "Verifying..." while checking cookies with VIC
+   - If cookies valid → scraping starts
+   - If cookies missing/expired → **cookie modal** appears for re-entry
+   - After submitting fresh cookies → scraping starts
+   - Progress view shows: Scraping Latest Ideas → Author Histories → Prices → Metrics
+   - Returns to leaderboard when complete
+
+5. **Viewing data:**
+   - Leaderboard shows authors ranked by XIRR
+   - Click row to expand and see individual picks
+   - Search by author name
+   - Sort by 1YR/3YR/5YR XIRR
+
+### Why Manual Scraping?
+
+Local mode uses **manual button click** to trigger scrapes because:
+- Selenium requires a local browser (can't run in cloud)
+- VIC cookies are stored locally on user's machine
+- No persistent server to schedule automated jobs
+- User controls when scraping happens (avoids running when not needed)
+
+### Cookie Verification Flow
+
+When clicking "Scrape New Ideas":
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Click "Scrape New Ideas"                                   │
+└─────────────────┬───────────────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│  POST /api/cookies/verify                                   │
+│  (Actually tests VIC authentication with Selenium)          │
+└─────────────────┬───────────────────────────────────────────┘
+                  │
+          ┌───────┴───────┐
+          │               │
+          ▼               ▼
+     valid: true     valid: false
+          │               │
+          ▼               ▼
+┌──────────────┐  ┌─────────────────────────────────────────┐
+│ Start scrape │  │ Show CookieModal with reason:           │
+│              │  │  - "no_cookies" → No cookies found      │
+└──────────────┘  │  - "expired" → Cookies have expired     │
+                  │  - "error" → Verification failed        │
+                  └─────────────────────────────────────────┘
+```
+
+---
+
 ## Related Documentation
 
-- [authentication-findings.md](./authentication-findings.md) - VIC auth research & local architecture design
-- [plan.md](./plan.md) - Development planning notes and implementation details
 - [README.md](./README.md) - Documentation index
 - [backend/README.md](../backend/README.md) - Local mode setup instructions
 - [data/README.md](../data/README.md) - Dataset information

@@ -59,6 +59,15 @@ export async function checkCookies() {
     return apiRequest('/cookies');
 }
 
+/**
+ * Verify that stored cookies are still valid for VIC authentication.
+ * This actually tests authentication by making a request to VIC.
+ * @returns {Promise<{valid: boolean, reason?: string, message: string}>}
+ */
+export async function verifyCookies() {
+    return apiRequest('/cookies/verify', { method: 'POST' });
+}
+
 // ==================== Scraping ====================
 
 /**

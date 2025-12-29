@@ -104,6 +104,46 @@ def check_cookies():
     })
 
 
+@app.route('/api/cookies/verify', methods=['POST'])
+def verify_cookies():
+    """
+    Verify that stored cookies are still valid for VIC authentication.
+    This actually tests authentication by making a request to VIC.
+    """
+    db = get_db()
+
+    if not db.has_valid_cookies():
+        return jsonify({
+            'valid': False,
+            'reason': 'no_cookies',
+            'message': 'No cookies stored'
+        })
+
+    cookies = db.get_cookies()
+
+    try:
+        with AuthorHistoryScraper(cookies=cookies, headless=True) as scraper:
+            is_auth = scraper.is_authenticated()
+
+        if is_auth:
+            return jsonify({
+                'valid': True,
+                'message': 'Cookies are valid'
+            })
+        else:
+            return jsonify({
+                'valid': False,
+                'reason': 'expired',
+                'message': 'Cookies have expired. Please re-enter fresh cookies.'
+            })
+    except Exception as e:
+        return jsonify({
+            'valid': False,
+            'reason': 'error',
+            'message': f'Failed to verify cookies: {str(e)}'
+        })
+
+
 # ==================== Scraping ====================
 
 @app.route('/api/scrape/start', methods=['POST'])

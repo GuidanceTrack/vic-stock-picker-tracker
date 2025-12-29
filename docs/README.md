@@ -53,6 +53,62 @@ If you're new to this project:
 
 ---
 
+## How to Use the App
+
+### 1. Install Dependencies
+
+Some packages need to be installed from the terminal before running the app:
+
+**Backend (Python):**
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+**Frontend (Node.js):**
+```bash
+cd frontend
+npm install
+```
+
+### 2. Start the Servers
+
+You need to run the backend and frontend in **two separate terminals**:
+
+**Terminal 1 - Backend:**
+```bash
+cd backend
+python app.py
+```
+This starts the Flask server on http://localhost:5000
+
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+This starts the React app on http://localhost:5173
+
+### 3. Browser Setup (Firefox)
+
+Before using the app, you need to set up cookie authentication:
+
+1. **Login to VIC** - Open Firefox and login to [valueinvestorsclub.com](https://valueinvestorsclub.com)
+2. **Install Cookie-Editor** - Install the [Cookie-Editor](https://addons.mozilla.org/en-US/firefox/addon/cookie-editor/) extension for Firefox
+3. **Export Cookies** - Click the Cookie-Editor icon and select "Export" → "Export as JSON"
+
+### 4. Using the App
+
+1. Open http://localhost:5173 in your browser
+2. On first boot, the app will prompt you to paste your VIC cookies
+3. Paste the JSON you exported from Cookie-Editor and submit
+4. The leaderboard will load after scraping completes
+5. To refresh data later, click the "Scrape New Ideas" button (you may need to re-export fresh cookies if they've expired)
+
+> **Note:** VIC cookies typically expire after 3-12 hours, so you may need to re-login and export fresh cookies periodically.
+
+---
+
 ## Project Structure
 
 ```

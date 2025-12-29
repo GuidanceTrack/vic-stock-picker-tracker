@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import VICLeaderboard from './components/VICLeaderboard';
 import CookieInput from './components/CookieInput';
 import ScrapeProgress from './components/ScrapeProgress';
-import { checkCookies, getScrapeStatus, startScrape } from './services/api';
+import { checkCookies, getScrapeStatus, startScrape, verifyCookies } from './services/api';
 
 // App modes
 const MODE = {
@@ -20,26 +20,39 @@ function App() {
     useEffect(() => {
         async function checkInitialState() {
             try {
-                // Check if backend is running
-                const cookieStatus = await checkCookies();
-
-                if (!cookieStatus.hasCookies) {
-                    // No cookies, need to input them
-                    setMode(MODE.COOKIE_INPUT);
-                    return;
-                }
-
-                // Check if scrape is in progress
+                // Check scrape status and data first
                 const scrapeStatus = await getScrapeStatus();
 
                 if (scrapeStatus.is_running) {
                     setMode(MODE.SCRAPING);
-                } else if (scrapeStatus.database?.counts?.authorsWithMetrics > 0) {
-                    // Have data, show leaderboard
+                    return;
+                }
+
+                // If we have data, show leaderboard regardless of cookies
+                // The "Scrape New Ideas" button will handle cookie verification
+                if (scrapeStatus.database?.counts?.authorsWithMetrics > 0) {
+                    setMode(MODE.LEADERBOARD);
+                    return;
+                }
+
+                // No data - check if we have valid cookies
+                const cookieStatus = await checkCookies();
+
+                if (!cookieStatus.hasCookies) {
+                    // No cookies and no data, need to input them
+                    setMode(MODE.COOKIE_INPUT);
+                    return;
+                }
+
+                // Have cookies but no data - verify they're still valid
+                const verification = await verifyCookies();
+
+                if (verification.valid) {
+                    // Valid cookies, show leaderboard (can trigger scrape from there)
                     setMode(MODE.LEADERBOARD);
                 } else {
-                    // Have cookies but no data, might need to scrape
-                    setMode(MODE.LEADERBOARD);
+                    // Cookies expired, need fresh ones
+                    setMode(MODE.COOKIE_INPUT);
                 }
             } catch (err) {
                 console.error('Error checking initial state:', err);

@@ -6,6 +6,8 @@ import { useAuthor } from '../hooks/useAuthor';
 import { useLocalLeaderboard } from '../hooks/useLocalLeaderboard';
 import { useLocalAuthor } from '../hooks/useLocalAuthor';
 import Pagination from './Pagination';
+import CookieModal from './CookieModal';
+import { verifyCookies } from '../services/api';
 
 // Custom hook for debouncing
 function useDebounce(value, delay) {
@@ -209,6 +211,11 @@ export default function VICLeaderboard({ useLocalApi = false, onStartScrape = nu
   const [showMethodology, setShowMethodology] = useState(false);
   const [searchInput, setSearchInput] = useState('');
 
+  // Cookie modal state
+  const [showCookieModal, setShowCookieModal] = useState(false);
+  const [cookieModalReason, setCookieModalReason] = useState(null);
+  const [isVerifyingCookies, setIsVerifyingCookies] = useState(false);
+
   // Debounce search input to avoid excessive queries
   const debouncedSearch = useDebounce(searchInput, 300);
   const isSearching = debouncedSearch.trim() !== '';
@@ -273,6 +280,42 @@ export default function VICLeaderboard({ useLocalApi = false, onStartScrape = nu
     goToPage(page);
   };
 
+  // Handle scrape button click - verify cookies first
+  const handleScrapeClick = async () => {
+    if (!onStartScrape) return;
+
+    setIsVerifyingCookies(true);
+    try {
+      const result = await verifyCookies();
+
+      if (result.valid) {
+        // Cookies are valid, proceed with scrape
+        onStartScrape();
+      } else {
+        // Cookies missing or expired, show modal
+        setCookieModalReason(result.reason || 'expired');
+        setShowCookieModal(true);
+      }
+    } catch (err) {
+      console.error('Error verifying cookies:', err);
+      // On error, assume cookies need refresh
+      setCookieModalReason('error');
+      setShowCookieModal(true);
+    } finally {
+      setIsVerifyingCookies(false);
+    }
+  };
+
+  // Handle successful cookie submission from modal
+  const handleCookiesSubmitted = () => {
+    setShowCookieModal(false);
+    setCookieModalReason(null);
+    // Now start the scrape
+    if (onStartScrape) {
+      onStartScrape();
+    }
+  };
+
   // Get last updated date from first investor's calculatedAt
   const lastUpdated = investors[0]?.calculatedAt;
   const lastUpdatedStr = lastUpdated
@@ -297,11 +340,21 @@ export default function VICLeaderboard({ useLocalApi = false, onStartScrape = nu
             <div className="flex items-center gap-4">
               {useLocalApi && onStartScrape && (
                 <button
-                  onClick={onStartScrape}
-                  className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                  onClick={handleScrapeClick}
+                  disabled={isVerifyingCookies}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <RefreshCw size={14} />
-                  Scrape New Ideas
+                  {isVerifyingCookies ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw size={14} />
+                      Scrape New Ideas
+                    </>
+                  )}
                 </button>
               )}
               <button
@@ -547,6 +600,14 @@ export default function VICLeaderboard({ useLocalApi = false, onStartScrape = nu
           </div>
         </div>
       )}
+
+      {/* Cookie Re-entry Modal */}
+      <CookieModal
+        isOpen={showCookieModal}
+        onClose={() => setShowCookieModal(false)}
+        onCookiesSubmitted={handleCookiesSubmitted}
+        reason={cookieModalReason}
+      />
     </div>
   );
 }

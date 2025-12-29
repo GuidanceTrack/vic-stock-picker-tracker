@@ -45,3 +45,14 @@ test-screenshot.png
 # Data files (large SQL dumps, etc.)
 data/*.sql
 data/*.db
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+
+# Windows artifacts
+nul
